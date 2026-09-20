@@ -19,6 +19,7 @@ from app.services.data_service import data_service
 from app.services.watchlist_service import watchlist_service
 from app.ai.llm_client import llm_client
 from app.ai.prompts import STOCK_ANALYSIS_SYSTEM_PROMPT, STOCK_ANALYSIS_USER_TEMPLATE
+from app.ui.pages.virtual_trading import BuyDialog
 
 class AIStreamWorker(QThread):
     """大模型流式生成异步工作线程"""
@@ -87,6 +88,12 @@ class StockDetailPage(QWidget):
         self.btn_fav.setObjectName("SecondaryButton")
         self.btn_fav.clicked.connect(self._on_fav_toggle)
         top_bar.addWidget(self.btn_fav)
+
+        self.btn_virtual_buy = QPushButton("💼 模拟买入")
+        self.btn_virtual_buy.setObjectName("SecondaryButton")
+        self.btn_virtual_buy.setStyleSheet("color: #38BDF8; font-weight: bold;")
+        self.btn_virtual_buy.clicked.connect(self._on_virtual_buy)
+        top_bar.addWidget(self.btn_virtual_buy)
 
         self.btn_ai_report = QPushButton("AI 一键深度研报")
         self.btn_ai_report.clicked.connect(self.generate_ai_report)
@@ -252,3 +259,8 @@ class StockDetailPage(QWidget):
             sym = sym.zfill(6)
             self.load_stock(sym)
             self.input_search.clear()
+
+    def _on_virtual_buy(self):
+        """弹出模拟买入建仓对话框"""
+        dlg = BuyDialog(self, default_symbol=self.current_symbol)
+        dlg.exec()

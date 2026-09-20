@@ -96,6 +96,64 @@ class ScreenerStrategy(Base):
     nl_prompt = Column(Text, default="", comment="原始自然语言提示词")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
 
+class VirtualAccount(Base):
+    """虚拟账户表（人手模式 vs AI 智能模式）"""
+    __tablename__ = "virtual_accounts"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    account_type = Column(String(32), unique=True, nullable=False, index=True, comment="MANUAL 手动 / AI 智能")
+    initial_capital = Column(Float, default=1000000.0, comment="初始设定本金")
+    available_cash = Column(Float, default=1000000.0, comment="可用流动资金")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
+
+class VirtualPosition(Base):
+    """虚拟账户当前持仓明细表"""
+    __tablename__ = "virtual_positions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    account_type = Column(String(32), nullable=False, index=True, comment="归属账户 MANUAL / AI")
+    symbol = Column(String(16), nullable=False, index=True, comment="股票代码")
+    name = Column(String(64), nullable=False, comment="股票名称")
+    total_amount = Column(Integer, default=0, comment="总持股数")
+    available_amount = Column(Integer, default=0, comment="今日可卖股数 (遵循 T+1)")
+    cost_price = Column(Float, default=0.0, comment="持仓均价(元)")
+    current_price = Column(Float, default=0.0, comment="最新现价(元)")
+    last_buy_date = Column(String(32), default="", comment="最近买入日期 YYYY-MM-DD")
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
+
+class VirtualTrade(Base):
+    """虚拟交易成交流水记录表"""
+    __tablename__ = "virtual_trades"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    account_type = Column(String(32), nullable=False, index=True, comment="操盘账户 MANUAL / AI")
+    symbol = Column(String(16), nullable=False, index=True, comment="股票代码")
+    name = Column(String(64), nullable=False, comment="股票名称")
+    action = Column(String(16), nullable=False, comment="BUY 买入 / SELL 卖出")
+    price = Column(Float, nullable=False, comment="成交单价(元)")
+    amount = Column(Integer, nullable=False, comment="成交股数")
+    total_value = Column(Float, nullable=False, comment="成交总额(元)")
+    tax_fee = Column(Float, default=0.0, comment="印花税(元)")
+    commission_fee = Column(Float, default=0.0, comment="券商佣金(元)")
+    realized_pnl = Column(Float, default=0.0, comment="平仓结算实现盈亏(元)")
+    realized_pct = Column(Float, default=0.0, comment="平仓实现收益率(%)")
+    reason = Column(Text, default="", comment="建仓理由或平仓逻辑")
+    trade_time = Column(DateTime, default=datetime.now, index=True, comment="成交时间戳")
+
+class TraderSkill(Base):
+    """AI 操盘技能库与实战复盘经验规则表"""
+    __tablename__ = "trader_skills"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    category = Column(String(64), default="趋势突破", comment="技能类别: 趋势突破/逢低伏击/破位止损/仓位纪律")
+    rule_title = Column(String(128), nullable=False, comment="军规标题")
+    rule_markdown = Column(Text, nullable=False, comment="实战军规核心逻辑与反思经验")
+    win_rate_score = Column(Float, default=80.0, comment="胜率参考分")
+    from_symbol = Column(String(16), default="", comment="归因源股票代码")
+    is_active = Column(Boolean, default=True, index=True, comment="是否激活注入 Prompt")
+    created_at = Column(DateTime, default=datetime.now, comment="沉淀时间")
+
 class DatabaseManager:
     """本地数据库会话管理器"""
 

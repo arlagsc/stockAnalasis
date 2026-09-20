@@ -49,9 +49,14 @@ class RecommendService:
 
         user_prompt = f"请评估以下初筛候选股票，评选出综合排名前 {top_n} 只最优质标的，并给出推荐理由与风险点：\n" + "\n".join(candidate_summary_lines)
 
+        # 动态检索并注入已沉淀的操盘技能知识库
+        from app.ai.skill_engine import skill_engine
+        skills_block = skill_engine.get_active_skills_prompt_block()
+        formatted_system_prompt = RECOMMEND_SYSTEM_PROMPT.format(learned_skills_block=skills_block)
+
         # 调用大模型生成结构化 JSON
         raw_response = llm_client.chat_complete(
-            system_prompt=RECOMMEND_SYSTEM_PROMPT,
+            system_prompt=formatted_system_prompt,
             user_prompt=user_prompt
         )
 

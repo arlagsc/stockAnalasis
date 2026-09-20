@@ -18,6 +18,7 @@ from app.ui.pages.watchlist import WatchlistPage
 from app.ui.pages.screener import ScreenerPage
 from app.ui.pages.recommend import RecommendPage
 from app.ui.pages.stock_detail import StockDetailPage
+from app.ui.pages.virtual_trading import VirtualTradingPage
 from app.ui.pages.settings import SettingsPage
 
 class MainWindow(QMainWindow):
@@ -67,7 +68,8 @@ class MainWindow(QMainWindow):
             ("⚡  智能筛选", 2),
             ("🎯  精选推荐", 3),
             ("🔍  个股研判", 4),
-            ("⚙️  系统设置", 5),
+            ("💼  虚拟操盘", 5),
+            ("⚙️  系统设置", 6),
         ]
         for title, index in nav_items:
             btn = QPushButton(title)
@@ -88,14 +90,16 @@ class MainWindow(QMainWindow):
         self.page_screener = ScreenerPage()
         self.page_recommend = RecommendPage()
         self.page_stock_detail = StockDetailPage()
+        self.page_virtual_trading = VirtualTradingPage()
         self.page_settings = SettingsPage()
 
-        self.stacked_widget.addWidget(self.page_dashboard)    # 0
-        self.stacked_widget.addWidget(self.page_watchlist)    # 1
-        self.stacked_widget.addWidget(self.page_screener)     # 2
-        self.stacked_widget.addWidget(self.page_recommend)    # 3
-        self.stacked_widget.addWidget(self.page_stock_detail) # 4
-        self.stacked_widget.addWidget(self.page_settings)     # 5
+        self.stacked_widget.addWidget(self.page_dashboard)        # 0
+        self.stacked_widget.addWidget(self.page_watchlist)        # 1
+        self.stacked_widget.addWidget(self.page_screener)         # 2
+        self.stacked_widget.addWidget(self.page_recommend)        # 3
+        self.stacked_widget.addWidget(self.page_stock_detail)     # 4
+        self.stacked_widget.addWidget(self.page_virtual_trading)  # 5
+        self.stacked_widget.addWidget(self.page_settings)         # 6
 
         main_layout.addWidget(self.stacked_widget)
 
@@ -117,6 +121,8 @@ class MainWindow(QMainWindow):
         self.page_screener.stock_selected.connect(self._navigate_to_stock_detail)
         # 推荐卡片 -> 跳转个股详情
         self.page_recommend.stock_selected.connect(self._navigate_to_stock_detail)
+        # 虚拟操盘持仓研判 -> 跳转个股详情
+        self.page_virtual_trading.stock_selected.connect(self._navigate_to_stock_detail)
 
     def switch_page(self, index: int):
         """切换显示的视图页面并高亮对应侧边栏按钮"""
@@ -137,6 +143,9 @@ class MainWindow(QMainWindow):
             sel_sym = self.page_watchlist.get_selected_symbol()
             if sel_sym and sel_sym != self.page_stock_detail.current_symbol:
                 self.page_stock_detail.load_stock(sel_sym)
+        elif index == 5:
+            # 切换至虚拟操盘：自动拉取最新行情刷新双账户持仓与净值
+            self.page_virtual_trading.refresh_data()
 
     def _navigate_to_stock_detail(self, symbol: str):
         """穿透跳转至个股研判页面"""
