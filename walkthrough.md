@@ -57,9 +57,10 @@ graph TD
 | 文件路径 | 核心类 / 关键函数 | 功能说明 |
 | :--- | :--- | :--- |
 | [`app/ai/llm_client.py`](file:///d:/AI/stockAnalasis/app/ai/llm_client.py) | `LLMClient.stream_chat()`<br>`LLMClient.chat_complete()` | 统一基于 OpenAI SDK 调用，支持流式打字生成、一次性结构化 JSON 交互与智能离线兜底。 |
-| [`app/ai/prompts.py`](file:///d:/AI/stockAnalasis/app/ai/prompts.py) | `STOCK_ANALYSIS_SYSTEM_PROMPT`<br>`TRADE_REFLECTION_SYSTEM_PROMPT` | 个股深度研报、自然语言选股、精选推荐与平仓交易大模型深度归因反思提示词模板。 |
+| [`app/ai/prompts.py`](file:///d:/AI/stockAnalasis/app/ai/prompts.py) | `STOCK_ANALYSIS_SYSTEM_PROMPT`<br>`TRADE_REFLECTION_SYSTEM_PROMPT`<br>`AUTO_TRADE_SYSTEM_PROMPT` | 个股深度研报、自然语言选股、精选推荐、平仓归因反思与 AI 自动建仓决策提示词模板。 |
 | [`app/ai/skill_engine.py`](file:///d:/AI/stockAnalasis/app/ai/skill_engine.py) | `SkillEngine.reflect_on_trade()`<br>`SkillEngine.get_active_skills_prompt_block()` | 操盘技能演进中枢：平仓触发 LLM 归因反思沉淀军规战则，并在后续推荐决策时动态提取 Few-Shot 注入。 |
 | [`app/services/trading_service.py`](file:///d:/AI/stockAnalasis/app/services/trading_service.py) | `TradingService.reset_account()`<br>`TradingService.buy_stock()`<br>`TradingService.sell_stock()`<br>`TradingService.refresh_positions_quotes()` | A 股仿真撮合引擎：支持自定义初始本金、100 股整数倍买入、T+1 纪律锁定/跨日解冻、真实印花税与佣金扣减。 |
+| [`app/services/auto_trader.py`](file:///d:/AI/stockAnalasis/app/services/auto_trader.py) | `AutoTrader.execute_auto_trading()` | AI 智能建仓决策中枢：双层风控核验、全市场 5565 支多因子粗选、操盘军规 (SKILL) 注入深度裁决、动态分仓计算与合规撮合。 |
 | [`app/services/screener_service.py`](file:///d:/AI/stockAnalasis/app/services/screener_service.py) | `ScreenerService.screen_by_natural_language()`<br>`ScreenerService.execute_filter_plan()` | 两阶段漏斗筛选：本地量化粗排将 5000+ 只降至 20~50 候选池 + 自然语言选股。 |
 | [`app/services/recommend_service.py`](file:///d:/AI/stockAnalasis/app/services/recommend_service.py) | `RecommendService.generate_recommendations()` | 复合因子综合评分 + 动态注入活跃操盘军规 + 大模型深度精选。 |
 | [`app/services/watchlist_service.py`](file:///d:/AI/stockAnalasis/app/services/watchlist_service.py) | `WatchlistService.add_to_watchlist()`<br>`WatchlistService.get_watchlist_with_quotes()` | 自选股池增删改查、自定义分组及与实时量价行情合并。 |
@@ -71,7 +72,7 @@ graph TD
 | [`app/ui/components/chart_widget.py`](file:///d:/AI/stockAnalasis/app/ui/components/chart_widget.py) | `StockChartWidget`<br>`CandlestickItem` | 基于 PyQtGraph 的 60 FPS 股票 K 线蜡烛图、均线族、成交量柱与联动十字光标。 |
 | [`app/ui/pages/dashboard.py`](file:///d:/AI/stockAnalasis/app/ui/pages/dashboard.py) | `DashboardPage` | 全市场股票大盘概览网格、涨跌分布卡片、模糊检索与穿透联动。 |
 | [`app/ui/pages/stock_detail.py`](file:///d:/AI/stockAnalasis/app/ui/pages/stock_detail.py) | `StockDetailPage`<br>`AIStreamWorker` | 个股深度研判，新增【💼 模拟买入】一键建仓对话框，异步流式打字渲染 AI 结构化研报。 |
-| [`app/ui/pages/virtual_trading.py`](file:///d:/AI/stockAnalasis/app/ui/pages/virtual_trading.py) | `VirtualTradingPage`<br>`BuyDialog`<br>`ResetCapitalDialog` | 虚拟操盘主工作台：人机双轨资产概况卡片、持仓明细、成交流水、PyQtGraph PK 走势曲线及 Skill 军规卡片管理。 |
+| [`app/ui/pages/virtual_trading.py`](file:///d:/AI/stockAnalasis/app/ui/pages/virtual_trading.py) | `VirtualTradingPage`<br>`BuyDialog`<br>`ResetCapitalDialog`<br>`AutoTradeWorker`<br>`AutoTradeResultDialog` | 虚拟操盘主工作台：人机双轨资产概况卡片、持仓明细、成交流水、PyQtGraph PK 走势曲线、Skill 军规卡片管理与【🤖 AI 一键自动建仓】异步管线。 |
 | [`app/ui/pages/screener.py`](file:///d:/AI/stockAnalasis/app/ui/pages/screener.py) | `ScreenerPage` | 自然语言选股指令执行面板与预设量化策略库。 |
 | [`app/ui/pages/recommend.py`](file:///d:/AI/stockAnalasis/app/ui/pages/recommend.py) | `RecommendPage`<br>`RecommendCard` | 推荐看板，瀑布流卡片展示综合评分、推荐理由与风险点。 |
 | [`app/ui/pages/settings.py`](file:///d:/AI/stockAnalasis/app/ui/pages/settings.py) | `SettingsPage` | 模型接入配置、API Key 加密保存、缓存维护与免责声明展示。 |
@@ -128,4 +129,19 @@ graph TD
     - **问题表现**：点击【➕ 模拟买入建仓】按钮时抛出 `TypeError: QLineEdit.__init__(bool)` 异常。
     - **根因分析**：PyQt/PySide6 的 `QPushButton.clicked` 信号会默认向槽函数传递一个 `checked: bool = False` 布尔值，当被 `_open_buy_dialog(symbol: str = "")` 捕获后，导致 `default_symbol` 变为 `False`，传给 `QLineEdit(False)` 触发类型匹配失败。
     - **修复措施**：在 [`BuyDialog`](file:///d:/AI/stockAnalasis/app/ui/pages/virtual_trading.py) 构造函数与 `_open_buy_dialog` 中对 `default_symbol` 实施类型防护（强制清洗为字符串），并将按钮点击信号绑定改为无参 lambda 调用，彻底杜绝类型污染。
+- **2026-09-20 [AI 自动计算建仓系统 (AutoTrader) 落地与闭环]**：
+  - **前置风控与标的选拔管线**：
+    1. 在 [`app/services/auto_trader.py`](file:///d:/AI/stockAnalasis/app/services/auto_trader.py) 构建 `AutoTrader` 决策服务，实现双层风控前置校验：AI 账户可用现金低于 2000 元安全拦截，持仓已达 5 支上限时拦截。
+    2. 全市场 5565 支股票 Pandas 向量化多因子粗筛，自动剔除已持仓标的、ST 股与极端涨跌停标的，选拔量价齐升的 Top 10 候选池。
+    3. 提取历史实战操盘军规 (Few-Shot) 注入大模型进行形态裁决与战术归因，内建本地多因子评分引擎作为离线平滑降级兜底。
+  - **动态加权分仓与合规撮合**：
+    1. 动态头寸测算：高置信度（$\ge 88$ 分）标的分配当前现金的 28% 目标资金，次优标的分配 18%，单票资金严格受控在 30% 上限之内。
+    2. 资金向下取整换算为 100 股整数倍（一手）调用 `trading_service.buy_stock` 撮合，自动归档成交流水并执行 T+1 交易纪律冻结。
+  - **表现层异步交互与弹窗报告**：
+    1. 在 [`app/ui/pages/virtual_trading.py`](file:///d:/AI/stockAnalasis/app/ui/pages/virtual_trading.py) 顶部操作栏新增深紫色高亮【🤖 AI 一键自动建仓】按钮。
+    2. 通过后台 `AutoTradeWorker(QThread)` 异步执行计算与推理，展示运行状态，避免阻塞 Qt 事件循环。
+    3. 任务完成后呼出卡片式 `AutoTradeResultDialog` 执行报告弹窗，详细展示成交价、股数、成交额以及 AI 决策归因与契合军规，并触发资产走势与持仓全量刷新。
+  - **集成验证与实机渲染**：
+    1. 编写自动化集成测试脚本 [`tests/test_auto_trader.py`](file:///d:/AI/stockAnalasis/tests/test_auto_trader.py)，覆盖低现金拦截、正常多因子自动建仓、100 股取整测算、T+1 冻结与流水核实、避开已有持仓去重建仓以及 5 支持仓上限风控拦截，所有 5 项测试全部 PASS。
+    2. 完成实机渲染截图校验，新按钮布局和谐，AI 账户自动买入后总资产与 5 支持仓市值同步精准更新。
 

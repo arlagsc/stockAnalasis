@@ -19,13 +19,104 @@ from PySide6.QtWidgets import (
     QTableWidgetItem, QHeaderView, QTabWidget, QDialog, QLineEdit,
     QComboBox, QSpinBox, QDoubleSpinBox, QMessageBox, QFrame, QScrollArea
 )
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QThread
 import pyqtgraph as pg
 
 from app.core.config import logger
 from app.services.trading_service import trading_service
+from app.services.auto_trader import auto_trader
 from app.ai.skill_engine import skill_engine
 from app.data.fetcher import data_fetcher
+
+class AutoTradeWorker(QThread):
+    """AI 自动计算建仓后台异步工作线程"""
+
+    finished_signal = Signal(dict)
+
+    def run(self):
+        try:
+            res = auto_trader.execute_auto_trading(account_type="AI", max_buy_count=2)
+            self.finished_signal.emit(res)
+        except Exception as e:
+            logger.error("AI 自动建仓工作线程执行异常: %s", str(e))
+            self.finished_signal.emit({
+                "success": False,
+                "msg": f"计算执行异常: {str(e)}",
+                "bought_items": [],
+                "executed_count": 0,
+            })
+
+class AutoTradeResultDialog(QDialog):
+    """AI 自动建仓执行汇报弹窗"""
+
+    def __init__(self, result: Dict[str, Any], parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("AI 自动计算建仓决策报告")
+        self.resize(520, 420)
+        self.setStyleSheet("background-color: #0F172A; color: #E2E8F0; font-size: 13px;")
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(14)
+
+        # 标题与概要
+        lbl_head = QLabel("🤖 AI 操盘手自动建仓执行报告")
+        lbl_head.setStyleSheet("font-size: 16px; font-weight: bold; color: #A855F7;")
+        layout.addWidget(lbl_head)
+
+        lbl_summary = QLabel(result.get("msg", ""))
+        lbl_summary.setWordWrap(True)
+        lbl_summary.setStyleSheet("color: #94A3B8; font-size: 12px; line-height: 1.4;")
+        layout.addWidget(lbl_summary)
+
+        # 滚动区域展示建仓卡片
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet("border: none; background: transparent;")
+        content_w = QWidget()
+        l_cards = QVBoxLayout(content_w)
+        l_cards.setSpacing(10)
+
+        items = result.get("bought_items", [])
+        if items:
+            for item in items:
+                card = QFrame()
+                card.setStyleSheet("background-color: #1E293B; border-radius: 6px; border: 1px solid #334155; padding: 10px;")
+                l_c = QVBoxLayout(card)
+                l_c.setSpacing(6)
+
+                h_title = QHBoxLayout()
+                lbl_name = QLabel(f"📈 {item['name']} ({item['symbol']})")
+                lbl_name.setStyleSheet("font-weight: bold; font-size: 14px; color: #38BDF8;")
+                lbl_score = QLabel(f"置信评分: {item['score']:.1f} 分")
+                lbl_score.setStyleSheet("color: #10B981; font-weight: bold;")
+                h_title.addWidget(lbl_name)
+                h_title.addStretch()
+                h_title.addWidget(lbl_score)
+                l_c.addLayout(h_title)
+
+                lbl_trade = QLabel(f"成交均价: {item['price']:.2f} 元 | 买入数量: {item['amount']:,} 股 | 成交金额: {item['total_value']:,.2f} 元 (T+1 锁定)")
+                lbl_trade.setStyleSheet("color: #CBD5E1; font-size: 12px;")
+                l_c.addWidget(lbl_trade)
+
+                lbl_reason = QLabel(f"💡 决策归因与军规: {item['reason']}")
+                lbl_reason.setWordWrap(True)
+                lbl_reason.setStyleSheet("color: #FCD34D; font-size: 11px; background-color: #0F172A; padding: 6px; border-radius: 4px;")
+                l_c.addWidget(lbl_reason)
+
+                l_cards.addWidget(card)
+        else:
+            lbl_none = QLabel("本次未执行实质买入撮合。")
+            lbl_none.setStyleSheet("color: #64748B; font-style: italic; padding: 20px;")
+            l_cards.addWidget(lbl_none)
+
+        l_cards.addStretch()
+        scroll.setWidget(content_w)
+        layout.addWidget(scroll)
+
+        btn_close = QPushButton("确 认")
+        btn_close.setStyleSheet("background-color: #0284C7; font-weight: bold; color: #FFFFFF; padding: 8px; border-radius: 4px;")
+        btn_close.clicked.connect(self.accept)
+        layout.addWidget(btn_close)
 
 class BuyDialog(QDialog):
     """虚拟建仓下单弹窗"""
@@ -179,6 +270,11 @@ class VirtualTradingPage(QWidget):
         self.btn_buy.setStyleSheet("background-color: #0284C7; font-weight: bold; color: #FFFFFF; padding: 6px 14px; border-radius: 4px;")
         self.btn_buy.clicked.connect(lambda: self._open_buy_dialog())
         top_bar.addWidget(self.btn_buy)
+
+        self.btn_auto_buy = QPushButton("🤖 AI 一键自动建仓")
+        self.btn_auto_buy.setStyleSheet("background-color: #7C3AED; font-weight: bold; color: #FFFFFF; padding: 6px 14px; border-radius: 4px;")
+        self.btn_auto_buy.clicked.connect(self._on_auto_trade_clicked)
+        top_bar.addWidget(self.btn_auto_buy)
 
         self.btn_refresh = QPushButton("🔄 刷新盘口行情")
         self.btn_refresh.clicked.connect(self.refresh_all)
@@ -511,3 +607,24 @@ class VirtualTradingPage(QWidget):
         dialog = ResetCapitalDialog(self)
         if dialog.exec() == QDialog.Accepted:
             self.refresh_all()
+
+    def _on_auto_trade_clicked(self):
+        """点击触发 AI 一键自动建仓管线"""
+        self.btn_auto_buy.setEnabled(False)
+        self.btn_auto_buy.setText("🤖 正在多因子选拔与军规推理中...")
+        
+        self._auto_worker = AutoTradeWorker()
+        self._auto_worker.finished_signal.connect(self._on_auto_trade_finished)
+        self._auto_worker.start()
+
+    def _on_auto_trade_finished(self, result: Dict[str, Any]):
+        """AI 自动建仓完成回调"""
+        self.btn_auto_buy.setEnabled(True)
+        self.btn_auto_buy.setText("🤖 AI 一键自动建仓")
+        
+        # 弹出执行成果报告
+        dlg = AutoTradeResultDialog(result, parent=self)
+        dlg.exec()
+
+        # 全量刷新盘口与账户状态
+        self.refresh_all()
