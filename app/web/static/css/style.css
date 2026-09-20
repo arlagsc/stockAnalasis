@@ -56,6 +56,183 @@ body {
   border-bottom: 1px solid var(--border-color);
 }
 
+/* 全局搜索条与拼音联想浮层 */
+.search-bar-wrap {
+  position: relative;
+  padding: 8px 16px;
+  background-color: var(--bg-surface);
+  border-bottom: 1px solid var(--border-color);
+  z-index: 95;
+}
+
+.search-input-box {
+  display: flex;
+  align-items: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  padding: 6px 12px;
+  gap: 8px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.search-input-box:focus-within {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.25);
+}
+
+.search-icon {
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+.search-input-box input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.search-input-box input::placeholder {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.search-clear-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+/* 悬浮联想面板 */
+.search-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 16px;
+  right: 16px;
+  background: rgba(18, 22, 34, 0.96);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  max-height: 380px;
+  overflow-y: auto;
+  z-index: 120;
+}
+
+.search-dropdown-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  font-size: 11px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.search-dropdown-tip {
+  color: var(--accent-cyan);
+  font-size: 10px;
+}
+
+.search-dropdown-list {
+  padding: 4px 0;
+}
+
+.search-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(35, 45, 66, 0.5);
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.search-item:last-child {
+  border-bottom: none;
+}
+
+.search-item:active {
+  background-color: var(--bg-card-hover);
+}
+
+.search-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.search-item-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.search-item-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.search-item-pinyin {
+  font-size: 10px;
+  color: var(--accent-cyan);
+  background: rgba(56, 189, 248, 0.12);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-family: monospace;
+}
+
+.search-item-code {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: monospace;
+}
+
+.search-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.search-item-quotes {
+  text-align: right;
+}
+
+.search-item-price {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.search-item-chg {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.search-btn-add {
+  background: rgba(56, 189, 248, 0.15);
+  color: var(--accent-cyan);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.search-btn-add.added {
+  background: rgba(16, 185, 129, 0.2);
+  color: var(--down-green);
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
 .brand-title {
   font-size: 18px;
   font-weight: 800;
@@ -588,4 +765,133 @@ body {
   padding: 40px 20px;
   color: var(--text-muted);
   font-size: 13px;
+}
+
+/* 全景大盘药丸胶囊切换栏 */
+.ranking-pills-bar {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 0 12px 0;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ranking-pills-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.ranking-pill {
+  flex-shrink: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  padding: 6px 14px;
+  border-radius: 18px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ranking-pill.active {
+  background: linear-gradient(135deg, #0284C7 0%, #38BDF8 100%);
+  color: #FFFFFF;
+  border-color: #38BDF8;
+  box-shadow: 0 2px 10px rgba(56, 189, 248, 0.3);
+}
+
+.rankings-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.ranking-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: transform 0.1s ease, border-color 0.15s;
+}
+
+.ranking-item:active {
+  transform: scale(0.985);
+  border-color: var(--accent-cyan);
+}
+
+.ranking-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rank-badge {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-muted);
+}
+
+.rank-badge.rank-1 {
+  background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+  color: #FFFFFF;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
+}
+
+.rank-badge.rank-2 {
+  background: linear-gradient(135deg, #94A3B8 0%, #64748B 100%);
+  color: #FFFFFF;
+}
+
+.rank-badge.rank-3 {
+  background: linear-gradient(135deg, #B45309 0%, #78350F 100%);
+  color: #FFFFFF;
+}
+
+.ranking-stock-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.ranking-stock-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.ranking-stock-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: monospace;
+}
+
+.ranking-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ranking-price-col {
+  text-align: right;
+}
+
+.ranking-price {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.ranking-extra {
+  font-size: 10px;
+  color: var(--text-muted);
 }

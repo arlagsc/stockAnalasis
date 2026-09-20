@@ -22,14 +22,33 @@
     </div>
     <div class="header-status">
       <span class="status-dot"></span>
-      <span>局域网已就绪</span>
+      <span id="header-status-text">局域网已就绪</span>
     </div>
   </header>
+
+  <!-- 全局搜索栏与拼音首字母联想浮层 -->
+  <div class="search-bar-wrap">
+    <div class="search-input-box">
+      <span class="search-icon">🔍</span>
+      <input id="global-search-input" type="text" placeholder="输入代码 / 拼音首字母 (如 PAYH, GZMT)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      <button id="search-clear-btn" class="search-clear-btn" onclick="clearSearch()">&times;</button>
+    </div>
+    <!-- 悬浮联想面板 -->
+    <div id="search-dropdown" class="search-dropdown" style="display:none;">
+      <div class="search-dropdown-header">
+        <span>匹配标的 (<span id="search-match-count">0</span>)</span>
+        <span class="search-dropdown-tip">支持拼音首字母 / 6位代码</span>
+      </div>
+      <div id="search-dropdown-list" class="search-dropdown-list">
+        <!-- 动态插入匹配的 Top 8 标的 -->
+      </div>
+    </div>
+  </div>
 
   <!-- 吐司通知组件 -->
   <div id="toast" style="display:none; position:fixed; top:70px; left:50%; transform:translateX(-50%); background:rgba(2,132,199,0.95); color:#FFF; padding:8px 18px; border-radius:20px; font-size:13px; font-weight:700; z-index:999; box-shadow:0 4px 16px rgba(0,0,0,0.5); transition:opacity 0.3s ease;"></div>
 
-  <!-- TAB 1: 市场与自选 -->
+  <!-- TAB 1: 全景大盘 (市场全貌与四大榜单) -->
   <main id="tab-market" class="tab-content active">
     <div class="section-header">
       <div class="section-title">全市场核心指数</div>
@@ -52,7 +71,28 @@
       </div>
     </div>
 
-    <!-- 我的自选股池 -->
+    <!-- 全景多因子多维排行榜 -->
+    <div class="section-header" style="margin-top: 18px;">
+      <div class="section-title">🌐 全市场全景排行</div>
+      <span style="font-size: 11px; color: var(--text-muted);">TOP 50</span>
+    </div>
+
+    <!-- 榜单药丸胶囊切换器 (Pills) -->
+    <div class="ranking-pills-bar">
+      <button class="ranking-pill active" data-category="gainers" onclick="switchRankingCategory('gainers')">今日涨幅榜</button>
+      <button class="ranking-pill" data-category="losers" onclick="switchRankingCategory('losers')">今日跌幅榜</button>
+      <button class="ranking-pill" data-category="volume" onclick="switchRankingCategory('volume')">成交额榜</button>
+      <button class="ranking-pill" data-category="turnover" onclick="switchRankingCategory('turnover')">换手率榜</button>
+    </div>
+
+    <!-- 排行榜标的列表流 -->
+    <div id="rankings-container" class="rankings-list-container">
+      <!-- 动态加载排行榜条目 -->
+    </div>
+  </main>
+
+  <!-- TAB 2: 我的自选 -->
+  <main id="tab-watchlist" class="tab-content">
     <div class="section-header">
       <div class="section-title">⭐ 我的自选池</div>
       <button class="btn-icon" onclick="openAddWatchlistPrompt()">+ 加自选</button>
@@ -62,7 +102,7 @@
     </div>
   </main>
 
-  <!-- TAB 2: 智能推荐 -->
+  <!-- TAB 3: 智能推荐 -->
   <main id="tab-recommend" class="tab-content">
     <div class="section-header">
       <div class="section-title">🎯 AI 智能精选推荐</div>
@@ -76,7 +116,7 @@
     </div>
   </main>
 
-  <!-- TAB 3: 个股深度研判 -->
+  <!-- TAB 4: 个股深度研判 -->
   <main id="tab-detail" class="tab-content">
     <div class="section-header">
       <div id="detail-title" class="section-title">个股深度研判</div>
@@ -107,7 +147,7 @@
     </div>
   </main>
 
-  <!-- TAB 4: 虚拟操盘 -->
+  <!-- TAB 5: 虚拟操盘 -->
   <main id="tab-trade" class="tab-content">
     <!-- 资产面板 -->
     <div class="portfolio-banner">
@@ -173,11 +213,15 @@
     </div>
   </div>
 
-  <!-- 底部固定导航栏 (iOS Tab Bar) -->
+  <!-- 底部固定导航栏 (iOS 5-Tab Bar) -->
   <nav class="mobile-nav">
     <div class="nav-item active" data-tab="tab-market">
-      <div class="nav-icon">📊</div>
-      <div class="nav-text">市场自选</div>
+      <div class="nav-icon">🌐</div>
+      <div class="nav-text">全景大盘</div>
+    </div>
+    <div class="nav-item" data-tab="tab-watchlist">
+      <div class="nav-icon">⭐</div>
+      <div class="nav-text">我的自选</div>
     </div>
     <div class="nav-item" data-tab="tab-recommend">
       <div class="nav-icon">🎯</div>

@@ -56,10 +56,13 @@ class MobileServerManager:
         qr.add_data(url)
         qr.make(fit=True)
         print("\n" + "=" * 54)
-        print(f"📱 请使用 iPhone 相机或微信扫描下方二维码直达：")
-        print(f"🔗 局域网访问链接: {url}")
+        print("请使用 iPhone 相机或微信扫描下方二维码直达：")
+        print(f"局域网访问链接: {url}")
         print("=" * 54 + "\n")
-        qr.print_ascii(invert=True)
+        try:
+            qr.print_ascii(invert=True)
+        except Exception:
+            pass
         print("\n" + "=" * 54 + "\n")
 
     @classmethod

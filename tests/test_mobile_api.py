@@ -91,3 +91,45 @@ async def test_pwa_static_assets():
         # JS 脚本
         res_js = await client.get("/js/app.js")
         assert res_js.status_code == 200
+
+@pytest.mark.anyio
+async def test_search_index_api():
+    """测试拼音首字母搜索轻量索引接口"""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get("/api/stock/search-index")
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+        assert len(data) > 0
+        # 验证包含三元组字段
+        first = data[0]
+        assert "s" in first
+        assert "n" in first
+        assert "p" in first
+        # 验证至少存在平安银行等标的的拼音首字母
+        symbols_map = {item["s"]: item for item in data}
+        if "000001" in symbols_map:
+            assert symbols_map["000001"]["p"] == "PAYH"
+        if "600519" in symbols_map:
+            assert symbols_map["600519"]["p"] == "GZMT"
+
+@pytest.mark.anyio
+async def test_market_rankings_api():
+    """测试全景大盘 4 大排行榜接口"""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        for cat in ["gainers", "losers", "volume", "turnover"]:
+            response = await client.get(f"/api/market/rankings?category={cat}&limit=10")
+            assert response.status_code == 200
+            list_data = response.json()
+            assert isinstance(list_data, list)
+            if len(list_data) > 0:
+                item = list_data[0]
+                assert item["rank"] == 1
+                assert "symbol" in item
+                assert "name" in item
+                assert "price" in item
+                assert "change_pct" in item
+                assert "amount_str" in item
+                assert "turnover_rate" in item

@@ -22,7 +22,7 @@ def main():
     args = parser.parse_args()
 
     print("\n" + "=" * 60)
-    print(f"🚀 正在启动 {APP_NAME} v{APP_VERSION} iPhone 移动端服务...")
+    print(f"正在启动 {APP_NAME} v{APP_VERSION} iPhone 移动端服务...")
     print("=" * 60)
 
     try:

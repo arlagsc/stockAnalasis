@@ -6,13 +6,16 @@
 """
 
 import os
+import re
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+from pypinyin import pinyin, Style
 
 from app.core.config import logger, APP_VERSION, APP_NAME
 from app.services.data_service import data_service
@@ -20,6 +23,50 @@ from app.services.watchlist_service import watchlist_service
 from app.services.trading_service import trading_service
 from app.services.recommend_service import recommend_service
 from app.data.fetcher import data_fetcher
+
+# 0. 拼音首字母提取与索引单例缓存
+def get_stock_pinyin_initials(name: str) -> str:
+    """提取股票简称对应的拼音首字母缩写（大写），支持 ST、英文字母及多音字"""
+    if not name:
+        return ""
+    cleaned = re.sub(r'[^\w\u4e00-\u9fa5]', '', str(name))
+    tokens = pinyin(cleaned, style=Style.FIRST_LETTER)
+    return "".join([t[0].upper() for t in tokens if t and t[0]])
+
+_search_index_cache: Optional[List[Dict[str, str]]] = None
+
+def get_or_build_search_index() -> List[Dict[str, str]]:
+    """获取或构建股票拼音与简拼搜索索引"""
+    global _search_index_cache
+    if _search_index_cache is not None and len(_search_index_cache) > 0:
+        return _search_index_cache
+
+    universe_df = data_service.get_stock_universe()
+    index_list: List[Dict[str, str]] = []
+    if not universe_df.empty:
+        for _, row in universe_df.iterrows():
+            sym = str(row.get("symbol", "")).zfill(6)
+            name = str(row.get("name", ""))
+            py = get_stock_pinyin_initials(name)
+            index_list.append({"s": sym, "n": name, "p": py})
+    else:
+        import json
+        json_path = Path(__file__).resolve().parent.parent / "data" / "stocks_universe.json"
+        if json_path.exists():
+            try:
+                with open(json_path, "r", encoding="utf-8") as f:
+                    stocks = json.load(f)
+                    for item in stocks:
+                        sym = str(item.get("symbol", "")).zfill(6)
+                        name = str(item.get("name", ""))
+                        py = get_stock_pinyin_initials(name)
+                        index_list.append({"s": sym, "n": name, "p": py})
+            except Exception as e:
+                logger.error("加载 stocks_universe.json 失败: %s", e)
+
+    _search_index_cache = index_list
+    logger.info("已生成股票搜索轻量拼音索引，包含 %d 支标的", len(_search_index_cache))
+    return _search_index_cache
 
 # 1. 实例化 FastAPI 核心应用
 app = FastAPI(
@@ -112,6 +159,90 @@ async def get_market_overview() -> Dict[str, Any]:
         }
     except Exception as e:
         logger.error("移动端获取大盘概览异常: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/market/rankings")
+async def get_market_rankings(
+    category: str = Query(default="gainers", pattern="^(gainers|losers|volume|turnover)$"),
+    limit: int = Query(default=50, ge=5, le=100)
+) -> List[Dict[str, Any]]:
+    """获取大盘多因子排行榜（今日涨幅榜、今日跌幅榜、成交额榜、换手率榜）"""
+    try:
+        universe_df = data_service.get_stock_universe()
+        if universe_df.empty:
+            return []
+
+        df = universe_df.copy()
+        # 字段清洗与数值转换
+        df["change_pct"] = pd.to_numeric(df["change_pct"], errors="coerce").fillna(0.0)
+        df["price"] = pd.to_numeric(df["close_price"], errors="coerce").fillna(0.0)
+
+        # 兼容 volume / amount
+        if "amount" in df.columns:
+            df["amount_num"] = pd.to_numeric(df["amount"], errors="coerce").fillna(0.0)
+        elif "volume" in df.columns:
+            df["amount_num"] = pd.to_numeric(df["volume"], errors="coerce").fillna(0.0)
+        else:
+            df["amount_num"] = 0.0
+
+        if "turnover_rate" in df.columns:
+            df["turnover_rate_num"] = pd.to_numeric(df["turnover_rate"], errors="coerce").fillna(0.0)
+        else:
+            df["turnover_rate_num"] = 0.0
+
+        if category == "gainers":
+            sorted_df = df.sort_values(by="change_pct", ascending=False)
+        elif category == "losers":
+            sorted_df = df.sort_values(by="change_pct", ascending=True)
+        elif category == "volume":
+            sorted_df = df.sort_values(by="amount_num", ascending=False)
+        elif category == "turnover":
+            sorted_df = df.sort_values(by="turnover_rate_num", ascending=False)
+        else:
+            sorted_df = df.sort_values(by="change_pct", ascending=False)
+
+        slice_df = sorted_df.head(limit)
+        results = []
+        for rank, (_, row) in enumerate(slice_df.iterrows(), start=1):
+            sym = str(row.get("symbol", "")).zfill(6)
+            name = str(row.get("name", ""))
+            price = float(row.get("price", 0.0))
+            chg = float(row.get("change_pct", 0.0))
+            amt = float(row.get("amount_num", 0.0))
+            turnover = float(row.get("turnover_rate_num", 0.0))
+
+            if amt >= 1e8:
+                amt_str = f"{amt / 1e8:.2f} 亿"
+            elif amt >= 1e4:
+                amt_str = f"{amt / 1e4:.1f} 万"
+            else:
+                amt_str = f"{amt:.0f}"
+
+            results.append({
+                "rank": rank,
+                "symbol": sym,
+                "name": name,
+                "price": price,
+                "change_pct": chg,
+                "amount_str": amt_str,
+                "turnover_rate": turnover,
+            })
+        return results
+    except Exception as e:
+        logger.error("移动端获取大盘排行榜异常: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/stock/search-index")
+async def get_search_index():
+    """获取全市场股票拼音首字母轻量索引，供前端离线/毫秒级模糊匹配"""
+    try:
+        index_data = get_or_build_search_index()
+        return JSONResponse(
+            content=index_data,
+            headers={"Cache-Control": "public, max-age=3600"}
+        )
+    except Exception as e:
+        logger.error("移动端获取股票搜索索引异常: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/watchlist")

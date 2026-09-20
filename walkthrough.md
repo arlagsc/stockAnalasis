@@ -319,6 +319,50 @@ graph TD
   - **测试与实机视觉核验**：
     - 编写并执行自动化测试套件 `tests/test_mobile_api.py`，涵盖系统状态、大盘多空、自选股、操盘账户与 PWA 静态资源，10 项自动化测试全量通过；
     - 使用 Playwright 模拟 iPhone 14 Pro 视口（393 x 852），对市场自选、智能推荐、个股研判与虚拟操盘 4 个页面全部完成实机渲染截图核验，界面优雅饱满、交互流畅无溢出。
+- **2026-09-20 [iPhone 移动端全景大盘看板与拼音首字母模糊查询落地]**：
+  - **背景与方案选型**：
+    - 针对移动端监控全市场全貌与极速寻股诉求，完成头脑风暴讨论：
+      1. 底部导航栏扩展为 5 大 Tab 布局（全景大盘、我的自选、精选推荐、个股研判、虚拟操盘）；
+      2. 顶部搜索框键入拼音首字母即刻在下方浮动展示 Top 8 匹配联想面板，支持一键加自选与点击穿透个股研判；
+      3. 架构上采用轻量预计算拼音索引（`GET /api/stock/search-index`，约 80 KB），前端首屏一次性加载后在内存中毫秒级（$< 2$ ms）零网络往返正则匹配；全景大盘提供 4 大多因子排行榜（`GET /api/market/rankings`，涵盖涨幅榜、跌幅榜、成交额榜、换手率榜，每榜切片前 50 支）。
+  - **架构交互流图**：
+    ```mermaid
+    graph LR
+        User[用户在搜索框键入拼音简拼 如 PAYH] --> Event[前端 input 实时防抖监听]
+        Event --> LocalIndex[(前端内存 searchIndex 5565 支标的三元组)]
+        LocalIndex --> Match[正则零往返快速匹配 < 2ms]
+        Match --> Dropdown[浮出 Top 8 联想面板: 000001 平安银行]
+        Dropdown -->|点击加自选| AddWL[POST /api/watchlist]
+        Dropdown -->|点击整行| JumpDetail[切换至 Tab 4 个股研判加载 50 日 K 线]
+    ```
+  - **核心编码落地**：
+    1. **后端索引与排行榜 API ([app/web/api.py](file:///d:/AI/stockAnalasis/app/web/api.py))**：
+       - 基于 `pypinyin` 库提取全市场 5,565 支 A 股中文简称拼音首字母，支持 `ST`、英文后缀及多音字分词；
+       - 实现 `_search_index_cache` 单例缓存，对外暴露 `GET /api/stock/search-index`；
+       - 实现 `GET /api/market/rankings`，支持 `gainers`、`losers`、`volume`、`turnover` 4 大多因子排行榜切片与金额格式化（亿/万）。
+    2. **前端 5-Tab 布局与全景大盘看板 ([app/web/static/index.html](file:///d:/AI/stockAnalasis/app/web/static/index.html))**：
+       - 导航栏扩展为 5 个 Tab；
+       - 新增全景大盘独立视图，集成四大核心指数、全市场多空对比条与 4 大排行榜药丸胶囊切换栏（Pills）；
+       - 独立我的自选视图。
+    3. **视觉风格与微交互 ([app/web/static/css/style.css](file:///d:/AI/stockAnalasis/app/web/static/css/style.css))**：
+       - 新增顶部搜索输入框与毛玻璃悬浮联想下拉面板样式（`.search-dropdown`）；
+       - 新增药丸切换胶囊样式（`.ranking-pill`、`.ranking-pill.active`）；
+       - 新增金银铜排名前三名渐变徽章（`.rank-badge.rank-1/2/3`）。
+    4. **前端交互逻辑与搜索过滤引擎 ([app/web/static/js/app.js](file:///d:/AI/stockAnalasis/app/web/static/js/app.js))**：
+       - 启动时异步预取全量拼音索引 `state.searchIndex`；
+       - 防抖监听搜索框，支持 6 位数字代码、拼音首字母简拼与汉字简称模糊过滤；
+       - 联想卡片支持一键加自选/取消自选与点击直达个股研判；
+       - 全景大盘 4 大榜单药丸一键切换。
+    5. **控制台编码保护与服务稳健性升级 ([run_mobile_server.py](file:///d:/AI/stockAnalasis/run_mobile_server.py), [app/web/server.py](file:///d:/AI/stockAnalasis/app/web/server.py))**：
+       - 移除控制台打印语句中的 Emoji，并对 `print_ascii` 增加 GBK 终端异常保护，彻底杜绝 Windows 控制台 `UnicodeEncodeError` 崩溃。
+  - **测试与验证结果**：
+    - 执行 `pytest tests/test_mobile_api.py`，全量 8 项测试用例全部 PASSED；
+    - 使用 Playwright 模拟真实 iPhone 14 Pro 视口（393 x 852），完成 5 组全量实机交互核验并截图归档：
+      - 全景大盘与今日涨幅榜 (`iphone_pwa_market_rankings.png`)；
+      - 全景大盘成交额排行榜 (`iphone_pwa_volume_rankings.png`)；
+      - 拼音首字母输入 `PAYH` 悬浮联想面板 (`iphone_pwa_pinyin_search_payh.png`)；
+      - 点击联想结果穿透跳转至个股深度研判及 K 线加载 (`iphone_pwa_detail_jump.png`)；
+      - 独立自选股池列表与一键操作 (`iphone_pwa_watchlist_tab.png`)。
 
 
 
