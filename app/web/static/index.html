@@ -147,11 +147,37 @@
     </div>
   </main>
 
-  <!-- TAB 5: 虚拟操盘 -->
+  <!-- TAB 5: 虚拟操盘 (人机双轨PK、AI自动建仓与技能军规库) -->
   <main id="tab-trade" class="tab-content">
-    <!-- 资产面板 -->
-    <div class="portfolio-banner">
-      <div class="portfolio-label">人类主观操盘账户总资产</div>
+    <!-- 人机双轨模式切换条 -->
+    <div class="trade-account-switch">
+      <button id="btn-acc-manual" class="trade-acc-pill active" onclick="switchTradeAccount('MANUAL')">
+        👤 人类主观操盘
+      </button>
+      <button id="btn-acc-ai" class="trade-acc-pill" onclick="switchTradeAccount('AI')">
+        🤖 AI 智能操盘
+      </button>
+    </div>
+
+    <!-- 人机收益 PK 战报横条 -->
+    <div class="pk-battle-bar">
+      <div class="pk-side pk-manual">
+        <span class="pk-label">人类主观</span>
+        <span id="pk-manual-return" class="pk-val color-up">+0.00%</span>
+      </div>
+      <div class="pk-vs">VS</div>
+      <div class="pk-side pk-ai">
+        <span class="pk-label">AI 量化</span>
+        <span id="pk-ai-return" class="pk-val color-up">+0.00%</span>
+      </div>
+    </div>
+
+    <!-- 资产面板 (支持人类/AI科技紫色切换) -->
+    <div id="portfolio-banner-card" class="portfolio-banner">
+      <div class="portfolio-header-row">
+        <div id="portfolio-account-label" class="portfolio-label">人类主观操盘账户总资产</div>
+        <span id="portfolio-tag" class="portfolio-tag">主观实战</span>
+      </div>
       <div id="trade-total-asset" class="portfolio-total">-- 元</div>
       <div class="portfolio-grid">
         <div>
@@ -169,18 +195,37 @@
       </div>
     </div>
 
-    <!-- 当前持仓 -->
-    <div class="section-header">
-      <div class="section-title">💼 当前持仓明细</div>
+    <!-- AI 专属自动建仓快捷工具条 (仅在 AI 模式下高亮展示) -->
+    <div id="ai-action-bar" class="ai-action-bar" style="display: none;">
+      <button class="btn-ai-autotrade" onclick="triggerAutoTrade()">
+        <span>🤖 AI 一键全自动计算建仓</span>
+      </button>
+      <div class="ai-action-subtip">基于 5565 支多因子粗选 + 操盘军规裁决 + T+1 纪律锁定</div>
+    </div>
+
+    <!-- 当前持仓明细 -->
+    <div class="section-header" style="margin-top: 14px;">
+      <div id="positions-title" class="section-title">💼 当前持仓明细</div>
       <button class="btn-icon" onclick="loadTradingData()">刷新价格</button>
     </div>
     <div id="positions-container">
       <!-- 动态持仓卡片 -->
     </div>
 
-    <!-- 悬浮买入建仓按钮 -->
-    <button class="fab-btn" onclick="openBuyModal()">
-      <span>➕ 模拟买入</span>
+    <!-- AI 操盘军规技能库 (实战反思沉淀) -->
+    <div id="ai-skills-section" class="ai-skills-section" style="margin-top: 20px;">
+      <div class="section-header">
+        <div class="section-title">🧠 AI 操盘军规经验库</div>
+        <span style="font-size: 11px; color: var(--accent-purple);">实盘反思沉淀</span>
+      </div>
+      <div id="skills-container" class="skills-container">
+        <!-- 动态加载军规卡片 -->
+      </div>
+    </div>
+
+    <!-- 悬浮操作按钮: 人类买入 或 AI 自动建仓 -->
+    <button id="fab-trade-btn" class="fab-btn" onclick="handleFabClick()">
+      <span id="fab-trade-text">➕ 模拟买入</span>
     </button>
   </main>
 
@@ -210,6 +255,21 @@
         <input id="buy-reason-input" class="form-input" value="手机端逢低伏击建仓">
       </div>
       <button class="btn-primary" onclick="submitBuyOrder()">确认以最新市价成交</button>
+    </div>
+  </div>
+
+  <!-- AI 自动建仓决策执行报告抽屉 (Bottom Sheet) -->
+  <div id="auto-trade-modal" class="modal-overlay" onclick="if(event.target===this)closeAutoTradeModal()">
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <div class="modal-title" style="color: var(--accent-purple);">🤖 AI 自动建仓决策报告</div>
+        <button class="modal-close" onclick="closeAutoTradeModal()">&times;</button>
+      </div>
+      <div id="auto-trade-msg" style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.5;"></div>
+      <div id="auto-trade-results-list" style="display:flex; flex-direction:column; gap:10px; max-height: 320px; overflow-y:auto; margin-bottom: 14px;">
+        <!-- 动态生成 AI 买入卡片 -->
+      </div>
+      <button class="btn-primary" style="background: linear-gradient(135deg, #7C3AED 0%, #A855F7 100%);" onclick="closeAutoTradeModal()">确认并同步持仓</button>
     </div>
   </div>
 

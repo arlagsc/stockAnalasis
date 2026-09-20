@@ -363,6 +363,45 @@ graph TD
       - 拼音首字母输入 `PAYH` 悬浮联想面板 (`iphone_pwa_pinyin_search_payh.png`)；
       - 点击联想结果穿透跳转至个股深度研判及 K 线加载 (`iphone_pwa_detail_jump.png`)；
       - 独立自选股池列表与一键操作 (`iphone_pwa_watchlist_tab.png`)。
+- **2026-09-20 [iPhone 移动端虚拟操盘 AI 模块全面落地 (人机 PK / 自动建仓 / 军规库)]**：
+  - **背景与问题定位**：
+    - 用户反馈在移动端虚拟操盘页面中无法看到 AI 相关的操盘模块（原先仅单向展示人类主观操盘账户）；
+    - 需将桌面端成熟的“人机双轨操盘体系”、“AI 一键自动建仓 (AutoTrader)”与“AI 实战反思操盘军规经验库 (Skills)”无缝移植至移动端。
+  - **架构交互流图**：
+    ```mermaid
+    graph LR
+        User[用户点击顶部药丸] -->|切换为 AI 智能操盘| State[state.currentTradeAccount = AI]
+        State --> Banner[资产卡片转为紫色科技霓虹主题 + 展示 AI 自动建仓入口]
+        State --> PKBar[更新人机收益 PK 战报: 人类 +0.08% VS AI +2.94%]
+        State --> Positions[展示 AI 5 支量化持仓明细]
+        State --> Skills[拉取 GET /api/trading/skills 渲染实战军规卡片]
+        
+        ClickAuto[点击 AI 一键全自动计算建仓] --> PostAuto[POST /api/trading/auto-trade]
+        PostAuto --> AutoEngine[AutoTrader: 风控门槛校验 + 5565 支多因子粗排 + 军规注入裁决]
+        AutoEngine --> Modal[弹出 AI 自动建仓决策执行报告抽屉]
+    ```
+  - **核心编码落地**：
+    1. **后端 API 扩展 ([app/web/api.py](file:///d:/AI/stockAnalasis/app/web/api.py))**：
+       - `GET /api/trading/comparison`：返回人类与 AI 账户的总资产、累计收益率、持仓数与可用现金对比数据；
+       - `GET /api/trading/skills`：调用 `skill_engine.list_all_skills()` 返回从实战平仓中反思沉淀的实战军规；
+       - `POST /api/trading/auto-trade`：驱动 `auto_trader.execute_auto_trading(account_type="AI")` 执行自动建仓管线并返回报告；
+       - 订单实体与买卖接口全面支持 `account_type: str = "MANUAL" | "AI"`，并修复 `refresh_positions_quotes` 方法调用。
+    2. **前端结构扩展 ([app/web/static/index.html](file:///d:/AI/stockAnalasis/app/web/static/index.html))**：
+       - 在 `tab-trade` 顶部集成人机双轨药丸切换栏（`[ 👤 人类主观操盘 ] [ 🤖 AI 智能操盘 ]`）；
+       - 新增人机收益率 PK 战报条（`.pk-battle-bar`）；
+       - 新增 AI 模式下的自动建仓操作条（`.ai-action-bar`）与 AI 实战反思军规经验库展示区（`.ai-skills-section`）；
+       - 新增 AI 自动建仓决策报告抽屉组件（`#auto-trade-modal`）。
+    3. **科技感金融样式 ([app/web/static/css/style.css](file:///d:/AI/stockAnalasis/app/web/static/css/style.css))**：
+       - 增加 AI 科技渐变紫主题（`.portfolio-banner.ai-theme`）；
+       - 增加人机切换 Pill 动画、PK 战报对比样式、军规卡片（`.skill-card`）及自动建仓卡片样式。
+    4. **前端交互与状态机 ([app/web/static/js/app.js](file:///d:/AI/stockAnalasis/app/web/static/js/app.js))**：
+       - 实现 `switchTradeAccount(accountType)` 状态切换与卡片主题切换；
+       - 实现 `loadTradingSkills()` 异步拉取并渲染军规；
+       - 实现 `triggerAutoTrade()` 异步执行 AI 决策并在抽屉中高亮展示买入标的、评分与军规归因；
+       - 修复持仓卡片中 `total_amount` 与 `floating_pnl_pct` 字段读取与平仓股数绑定。
+    5. **自动化测试与实机验证 ([tests/test_mobile_api.py](file:///d:/AI/stockAnalasis/tests/test_mobile_api.py), [tests/test_iphone_ai_trading.py](file:///d:/AI/stockAnalasis/tests/test_iphone_ai_trading.py))**：
+       - 新增 `test_ai_trading_and_skills_api` 自动化用例，9 项测试 100% 通过；
+       - 使用 Playwright 模拟真实 iPhone 14 Pro 视口（393 x 852），截取人类主观操盘与 PK 战报、AI 智能操盘模式与 AI 自动建仓决策报告弹窗，全流程验证通过。
 
 
 

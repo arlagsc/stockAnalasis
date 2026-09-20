@@ -133,3 +133,31 @@ async def test_market_rankings_api():
                 assert "change_pct" in item
                 assert "amount_str" in item
                 assert "turnover_rate" in item
+
+@pytest.mark.anyio
+async def test_ai_trading_and_skills_api():
+    """测试人机操盘对比、AI 军规技能与自动建仓接口"""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # 1. 人机收益对比
+        res_cmp = await client.get("/api/trading/comparison")
+        assert res_cmp.status_code == 200
+        cmp_data = res_cmp.json()
+        assert "manual" in cmp_data
+        assert "ai" in cmp_data
+        assert "total_return_pct" in cmp_data["manual"]
+        assert "total_return_pct" in cmp_data["ai"]
+
+        # 2. AI 操盘军规技能库
+        res_skills = await client.get("/api/trading/skills")
+        assert res_skills.status_code == 200
+        skills_data = res_skills.json()
+        assert isinstance(skills_data, list)
+
+        # 3. AI 自动建仓管线响应
+        res_auto = await client.post("/api/trading/auto-trade?max_buy_count=1")
+        assert res_auto.status_code == 200
+        auto_data = res_auto.json()
+        assert "success" in auto_data
+        assert "msg" in auto_data
+        assert "bought_items" in auto_data

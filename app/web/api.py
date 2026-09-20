@@ -22,6 +22,8 @@ from app.services.data_service import data_service
 from app.services.watchlist_service import watchlist_service
 from app.services.trading_service import trading_service
 from app.services.recommend_service import recommend_service
+from app.services.auto_trader import auto_trader
+from app.ai.skill_engine import skill_engine
 from app.data.fetcher import data_fetcher
 
 # 0. 拼音首字母提取与索引单例缓存
@@ -86,12 +88,14 @@ app.add_middleware(
 
 # 2. 请求与响应数据实体定义
 class BuyOrderRequest(BaseModel):
+    account_type: str = Field(default="MANUAL", description="操盘账户类型 MANUAL 或 AI")
     symbol: str = Field(description="6 位股票代码")
     amount: int = Field(default=100, description="买入股数，必须为 100 整数倍")
     price: Optional[float] = Field(default=None, description="自定义买入价，为空则使用现价")
     reason: Optional[str] = Field(default="手机端快捷买入", description="建仓战术理由")
 
 class SellOrderRequest(BaseModel):
+    account_type: str = Field(default="MANUAL", description="操盘账户类型 MANUAL 或 AI")
     symbol: str = Field(description="6 位股票代码")
     amount: int = Field(default=100, description="卖出股数")
     price: Optional[float] = Field(default=None, description="自定义卖出价，为空则使用现价")
@@ -344,18 +348,67 @@ async def get_trading_positions(account_type: str = "MANUAL") -> List[Dict[str, 
 async def refresh_trading_quotes(account_type: str = "MANUAL") -> Dict[str, Any]:
     """定向极速刷新持仓最新价格盘口"""
     try:
-        count = trading_service.refresh_positions_quotes_fast(account_type.upper())
-        return {"success": True, "refreshed_count": count}
+        trading_service.refresh_positions_quotes(account_type.upper())
+        return {"success": True}
     except Exception as e:
         logger.error("移动端定向刷新持仓价格异常: %s", e)
         return {"success": False, "error": str(e)}
+
+@app.get("/api/trading/comparison")
+async def get_trading_comparison() -> Dict[str, Any]:
+    """获取人机双轨账户（人类主观 vs AI 智能）收益与资产对比数据"""
+    try:
+        manual_sum = trading_service.get_account_summary("MANUAL")
+        ai_sum = trading_service.get_account_summary("AI")
+        return {
+            "manual": {
+                "account_name": "人类主观操盘",
+                "total_equity": float(manual_sum.get("total_equity", 100000.0)),
+                "total_return_pct": float(manual_sum.get("total_return_pct", 0.0)),
+                "position_count": manual_sum.get("position_count", 0),
+                "available_cash": float(manual_sum.get("available_cash", 100000.0)),
+                "floating_pnl": float(manual_sum.get("floating_pnl", 0.0)),
+            },
+            "ai": {
+                "account_name": "AI 智能操盘",
+                "total_equity": float(ai_sum.get("total_equity", 100000.0)),
+                "total_return_pct": float(ai_sum.get("total_return_pct", 0.0)),
+                "position_count": ai_sum.get("position_count", 0),
+                "available_cash": float(ai_sum.get("available_cash", 100000.0)),
+                "floating_pnl": float(ai_sum.get("floating_pnl", 0.0)),
+            }
+        }
+    except Exception as e:
+        logger.error("移动端获取人机操盘对比异常: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/trading/skills")
+async def get_trading_skills() -> List[Dict[str, Any]]:
+    """获取 AI 操盘手实战反思沉淀的交易技能与军规库"""
+    try:
+        skills = skill_engine.list_all_skills()
+        return skills
+    except Exception as e:
+        logger.error("移动端获取操盘军规技能列表异常: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/trading/auto-trade")
+async def execute_auto_trade(max_buy_count: int = 2) -> Dict[str, Any]:
+    """触发 AI 一键自动计算与多因子建仓管线"""
+    try:
+        res = auto_trader.execute_auto_trading(account_type="AI", max_buy_count=max_buy_count)
+        return res
+    except Exception as e:
+        logger.error("移动端执行 AI 自动建仓异常: %s", e)
+        return {"success": False, "msg": f"AI 自动建仓异常: {str(e)}", "bought_items": [], "executed_count": 0}
 
 @app.post("/api/trading/buy")
 async def execute_buy(req: BuyOrderRequest) -> Dict[str, Any]:
     """模拟市价/指定价买入建仓"""
     try:
+        target_account = (req.account_type or "MANUAL").upper()
         success, msg = trading_service.buy_stock(
-            account_type="MANUAL",
+            account_type=target_account,
             symbol=req.symbol,
             amount=req.amount,
             custom_price=req.price,
@@ -370,8 +423,9 @@ async def execute_buy(req: BuyOrderRequest) -> Dict[str, Any]:
 async def execute_close(req: SellOrderRequest) -> Dict[str, Any]:
     """模拟一键平仓卖出"""
     try:
+        target_account = (req.account_type or "MANUAL").upper()
         success, msg, trade_detail = trading_service.sell_stock(
-            account_type="MANUAL",
+            account_type=target_account,
             symbol=req.symbol,
             amount=req.amount,
             custom_price=req.price,

@@ -9,6 +9,7 @@ const state = {
   currentSymbol: '002429',
   currentStockName: '兆驰股份',
   currentRankingCategory: 'gainers',
+  currentTradeAccount: 'MANUAL', // 'MANUAL' | 'AI'
   watchlist: [],
   searchIndex: [],     // 格式: [{s: '000001', n: '平安银行', p: 'PAYH'}, ...]
   quotesMap: {},       // 代码 -> {price, change_pct} 快照缓存
@@ -615,11 +616,77 @@ function renderKLineChart(klines) {
   ctx.fillText('— MA5 均线', padding.left + 5, 14);
 }
 
-// 9. 虚拟操盘逻辑
+// 9. 虚拟操盘逻辑 (人机双轨操盘、AI自动建仓与技能军规库)
+function switchTradeAccount(accountType) {
+  state.currentTradeAccount = accountType;
+  const isAI = accountType === 'AI';
+
+  // 药丸切换高亮
+  const btnManual = document.getElementById('btn-acc-manual');
+  const btnAi = document.getElementById('btn-acc-ai');
+  if (btnManual && btnAi) {
+    btnManual.classList.toggle('active', !isAI);
+    btnAi.classList.toggle('active', isAI);
+    btnAi.classList.toggle('ai-active', isAI);
+  }
+
+  // 资产卡片科技主题切换
+  const banner = document.getElementById('portfolio-banner-card');
+  const labelEl = document.getElementById('portfolio-account-label');
+  const tagEl = document.getElementById('portfolio-tag');
+  const aiActionBar = document.getElementById('ai-action-bar');
+  const posTitle = document.getElementById('positions-title');
+  const fabText = document.getElementById('fab-trade-text');
+
+  if (banner) {
+    banner.classList.toggle('ai-theme', isAI);
+  }
+  if (labelEl) {
+    labelEl.textContent = isAI ? 'AI 智能自动操盘账户总资产' : '人类主观操盘账户总资产';
+  }
+  if (tagEl) {
+    tagEl.textContent = isAI ? 'AI 量化' : '主观实战';
+  }
+  if (aiActionBar) {
+    aiActionBar.style.display = isAI ? 'block' : 'none';
+  }
+  if (posTitle) {
+    posTitle.textContent = isAI ? '🤖 AI 当前持仓明细' : '💼 当前持仓明细';
+  }
+  if (fabText) {
+    fabText.textContent = isAI ? '🤖 自动建仓' : '➕ 模拟买入';
+  }
+
+  // 重新加载数据
+  loadTradingData();
+}
+
 async function loadTradingData() {
+  const currentAcc = state.currentTradeAccount || 'MANUAL';
+
   try {
-    // 1. 获取账户资金总览
-    const sumRes = await fetch('/api/trading/summary?account_type=MANUAL');
+    // 1. 获取人机双轨 PK 对比战报
+    fetch('/api/trading/comparison').then(r => r.json()).then(cmp => {
+      if (cmp && cmp.manual && cmp.ai) {
+        const mRet = Number(cmp.manual.total_return_pct || 0);
+        const aiRet = Number(cmp.ai.total_return_pct || 0);
+
+        const mEl = document.getElementById('pk-manual-return');
+        if (mEl) {
+          mEl.textContent = `${mRet > 0 ? '+' : ''}${mRet.toFixed(2)}%`;
+          mEl.className = `pk-val ${getChangeClass(mRet)}`;
+        }
+
+        const aiEl = document.getElementById('pk-ai-return');
+        if (aiEl) {
+          aiEl.textContent = `${aiRet > 0 ? '+' : ''}${aiRet.toFixed(2)}%`;
+          aiEl.className = `pk-val ${getChangeClass(aiRet)}`;
+        }
+      }
+    }).catch(e => console.warn('获取人机对比战报异常', e));
+
+    // 2. 获取当前账户资金总览
+    const sumRes = await fetch(`/api/trading/summary?account_type=${currentAcc}`);
     if (sumRes.ok) {
       const sum = await sumRes.json();
       document.getElementById('trade-total-asset').textContent = `${formatPrice(sum.total_equity || sum.total_asset)} 元`;
@@ -633,58 +700,176 @@ async function loadTradingData() {
       document.getElementById('trade-holding-val').textContent = `${formatPrice(sum.market_value || sum.holding_market_val)} 元`;
     }
 
-    // 2. 定向高速刷新价格
-    fetch('/api/trading/refresh-quotes?account_type=MANUAL', { method: 'POST' });
+    // 3. 定向高速刷新价格
+    fetch(`/api/trading/refresh-quotes?account_type=${currentAcc}`, { method: 'POST' });
 
-    // 3. 读取当前持仓明细
-    const posRes = await fetch('/api/trading/positions?account_type=MANUAL');
+    // 4. 读取当前账户持仓明细
+    const posRes = await fetch(`/api/trading/positions?account_type=${currentAcc}`);
     if (posRes.ok) {
       const positions = await posRes.json();
       const container = document.getElementById('positions-container');
       if (!container) return;
 
       if (!positions || positions.length === 0) {
-        container.innerHTML = '<div class="empty-state">当前无任何持仓标的，点击右下角「+ 模拟买入」建仓</div>';
-        return;
+        const emptyTip = currentAcc === 'AI' 
+          ? 'AI 账户当前空仓，可点击上方「AI 一键全自动计算建仓」'
+          : '当前无任何持仓标的，点击右下角「+ 模拟买入」建仓';
+        container.innerHTML = `<div class="empty-state">${emptyTip}</div>`;
+      } else {
+        container.innerHTML = positions.map(pos => {
+          const pnl = Number(pos.floating_pnl || 0);
+          const pnlPct = Number(pos.floating_pnl_pct != null ? pos.floating_pnl_pct : (pos.return_pct || 0));
+          const colorCls = getChangeClass(pnl);
+          const totalShares = pos.total_amount != null ? pos.total_amount : (pos.amount || 0);
+          const name = pos.name || pos.symbol;
+
+          return `
+            <div class="position-card">
+              <div class="position-row">
+                <span class="position-name">${name} (${pos.symbol})</span>
+                <span class="position-pnl ${colorCls}">${pnl > 0 ? '+' : ''}${formatPrice(pnl)} (${formatChange(pnlPct)})</span>
+              </div>
+              <div class="position-detail">
+                <span>持仓: ${totalShares} 股</span>
+                <span>成本: ${formatPrice(pos.cost_price)}</span>
+                <span>现价: ${formatPrice(pos.current_price)}</span>
+              </div>
+              <div class="position-actions">
+                <button class="btn-cyan-sm" onclick="openStockDetail('${pos.symbol}', '${name}')">研判</button>
+                <button class="btn-danger-sm" onclick="closePosition('${pos.symbol}', ${totalShares})">一键平仓</button>
+              </div>
+            </div>
+          `;
+        }).join('');
       }
-
-      container.innerHTML = positions.map(pos => {
-        const pnl = Number(pos.floating_pnl || 0);
-        const pnlPct = Number(pos.return_pct || 0);
-        const colorCls = getChangeClass(pnl);
-
-        return `
-          <div class="position-card">
-            <div class="position-row">
-              <span class="position-name">${pos.name} (${pos.symbol})</span>
-              <span class="position-pnl ${colorCls}">${pnl > 0 ? '+' : ''}${formatPrice(pnl)} (${formatChange(pnlPct)})</span>
-            </div>
-            <div class="position-detail">
-              <span>持仓: ${pos.amount} 股</span>
-              <span>成本: ${formatPrice(pos.avg_cost)}</span>
-              <span>现价: ${formatPrice(pos.current_price)}</span>
-            </div>
-            <div class="position-actions">
-              <button class="btn-cyan-sm" onclick="openStockDetail('${pos.symbol}', '${pos.name}')">研判</button>
-              <button class="btn-danger-sm" onclick="closePosition('${pos.symbol}', ${pos.amount})">一键平仓</button>
-            </div>
-          </div>
-        `;
-      }).join('');
     }
+
+    // 5. 渲染 AI 实战反思操盘军规经验库
+    loadTradingSkills();
+
   } catch (err) {
-    console.error('加载交易数据失败', err);
+    console.error('加载操盘交易数据失败', err);
+  }
+}
+
+// 加载 AI 操盘实战军规知识库
+async function loadTradingSkills() {
+  const container = document.getElementById('skills-container');
+  if (!container) return;
+
+  try {
+    const res = await fetch('/api/trading/skills');
+    if (!res.ok) return;
+    const skills = await res.json();
+
+    if (!skills || skills.length === 0) {
+      container.innerHTML = '<div class="empty-state">尚未沉淀实战反思军规，平仓交易后将自动提炼</div>';
+      return;
+    }
+
+    container.innerHTML = skills.map(s => {
+      const score = Number(s.win_rate_score || 75).toFixed(1);
+      return `
+        <div class="skill-card">
+          <div class="skill-header">
+            <div class="skill-title-row">
+              <span class="skill-category">${s.category || '综合战法'}</span>
+              <span class="skill-title">${s.rule_title}</span>
+            </div>
+            <span class="skill-score">置信 ${score} 分</span>
+          </div>
+          <div class="skill-body">${s.rule_markdown}</div>
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    console.warn('加载操盘技能库失败', err);
+  }
+}
+
+// 触发 AI 一键自动建仓
+async function triggerAutoTrade() {
+  const btn = document.querySelector('.btn-ai-autotrade');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳ AI 正在分析全市场 5565 支多因子模型与军规...</span>';
+  }
+
+  showToast('AI 正在执行多因子粗选与军规深度裁决...');
+
+  try {
+    const res = await fetch('/api/trading/auto-trade?max_buy_count=2', { method: 'POST' });
+    const data = await res.json();
+    
+    // 打开结果汇报模态框
+    const modal = document.getElementById('auto-trade-modal');
+    const msgEl = document.getElementById('auto-trade-msg');
+    const listEl = document.getElementById('auto-trade-results-list');
+
+    if (msgEl) msgEl.textContent = data.msg || '决策执行完成';
+    
+    if (listEl) {
+      const items = data.bought_items || [];
+      if (items.length === 0) {
+        listEl.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-muted); font-size:12px;">本次未达到建仓买入阈值或触发风控门槛限制</div>';
+      } else {
+        listEl.innerHTML = items.map(item => `
+          <div class="auto-bought-card">
+            <div class="auto-bought-top">
+              <span class="auto-bought-name">${item.name} (${item.symbol})</span>
+              <span class="auto-bought-score">置信评分: ${Number(item.score || 0).toFixed(1)}分</span>
+            </div>
+            <div class="auto-bought-detail">
+              均价: ${formatPrice(item.price)} 元 | 数量: ${item.amount} 股 | 总额: ${formatPrice(item.total_value)} 元
+            </div>
+            <div class="auto-bought-reason">💡 军规归因: ${item.reason}</div>
+          </div>
+        `).join('');
+      }
+    }
+
+    if (modal) modal.classList.add('active');
+
+    // 重新刷新操盘数据
+    loadTradingData();
+  } catch (err) {
+    alert(`AI 自动建仓失败: ${err.message}`);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<span>🤖 AI 一键全自动计算建仓</span>';
+    }
+  }
+}
+
+function closeAutoTradeModal() {
+  const modal = document.getElementById('auto-trade-modal');
+  if (modal) modal.classList.remove('active');
+}
+
+function handleFabClick() {
+  if (state.currentTradeAccount === 'AI') {
+    triggerAutoTrade();
+  } else {
+    openBuyModal();
   }
 }
 
 async function closePosition(symbol, amount) {
-  if (!confirm(`确认以当前最新市价全额平仓 ${symbol} (${amount}股) 吗？`)) return;
+  const currentAcc = state.currentTradeAccount || 'MANUAL';
+  const accName = currentAcc === 'AI' ? 'AI 账户' : '主观账户';
+  if (!confirm(`确认在 [${accName}] 中以当前最新市价全额平仓 ${symbol} (${amount}股) 吗？`)) return;
 
   try {
     const res = await fetch('/api/trading/close', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ symbol, amount, reason: '手机端一键平仓' })
+      body: JSON.stringify({
+        account_type: currentAcc,
+        symbol: symbol,
+        amount: amount,
+        reason: `${accName}手机端平仓了结`
+      })
     });
     const data = await res.json();
     if (data.success) {
@@ -725,6 +910,7 @@ async function submitBuyOrder() {
   const symbol = (document.getElementById('buy-symbol-input').value || '').trim();
   const amount = parseInt(document.getElementById('buy-amount-input').value, 10);
   const reason = document.getElementById('buy-reason-input').value || '手机端伏击建仓';
+  const currentAcc = state.currentTradeAccount || 'MANUAL';
 
   if (!symbol || symbol.length !== 6) {
     alert('请输入规范的 6 位数字股票代码');
@@ -739,7 +925,12 @@ async function submitBuyOrder() {
     const res = await fetch('/api/trading/buy', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ symbol, amount, reason })
+      body: JSON.stringify({
+        account_type: currentAcc,
+        symbol: symbol,
+        amount: amount,
+        reason: reason
+      })
     });
     const data = await res.json();
     if (data.success) {

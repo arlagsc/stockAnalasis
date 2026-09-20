@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 
 APP_NAME = "StockAI"
 APP_AUTHOR = "StockAI_Team"
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.2.0"
 
 class LLMProviderConfig(BaseModel):
     """大模型服务商配置实体"""
