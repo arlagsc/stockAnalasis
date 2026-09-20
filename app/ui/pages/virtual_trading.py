@@ -48,9 +48,10 @@ class BuyDialog(QDialog):
             self.combo_account.setCurrentIndex(1)
         layout.addWidget(self.combo_account)
 
-        # 股票代码
+        # 股票代码（防御布尔值传入）
         layout.addWidget(QLabel("股票代码 (6位代码):"))
-        self.input_symbol = QLineEdit(default_symbol)
+        sym_str = default_symbol if isinstance(default_symbol, str) else ""
+        self.input_symbol = QLineEdit(sym_str)
         self.input_symbol.setPlaceholderText("例如 002429 或 600519")
         layout.addWidget(self.input_symbol)
 
@@ -176,7 +177,7 @@ class VirtualTradingPage(QWidget):
 
         self.btn_buy = QPushButton("➕ 模拟买入建仓")
         self.btn_buy.setStyleSheet("background-color: #0284C7; font-weight: bold; color: #FFFFFF; padding: 6px 14px; border-radius: 4px;")
-        self.btn_buy.clicked.connect(self._open_buy_dialog)
+        self.btn_buy.clicked.connect(lambda: self._open_buy_dialog())
         top_bar.addWidget(self.btn_buy)
 
         self.btn_refresh = QPushButton("🔄 刷新盘口行情")
@@ -501,7 +502,8 @@ class VirtualTradingPage(QWidget):
         self._render_skills_table()
 
     def _open_buy_dialog(self, symbol: str = ""):
-        dialog = BuyDialog(self, default_symbol=symbol)
+        sym_str = symbol if isinstance(symbol, str) else ""
+        dialog = BuyDialog(self, default_symbol=sym_str)
         if dialog.exec() == QDialog.Accepted:
             self.refresh_all()
 
