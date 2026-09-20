@@ -132,6 +132,11 @@ class MainWindow(QMainWindow):
         elif index == 3:
             # 精选推荐页面自动初始化
             pass
+        elif index == 4:
+            # 切换至个股研判：若自选股池或大盘列表有选中的高亮标的，自动同步研判该标的
+            sel_sym = self.page_watchlist.get_selected_symbol()
+            if sel_sym and sel_sym != self.page_stock_detail.current_symbol:
+                self.page_stock_detail.load_stock(sel_sym)
 
     def _navigate_to_stock_detail(self, symbol: str):
         """穿透跳转至个股研判页面"""

@@ -285,6 +285,43 @@ class DataFetcher:
             logger.warning("备选东财直连抓取行情异常: %s", str(e))
             return pd.DataFrame()
 
+    def _fetch_tencent_daily_kline(self, symbol: str, count: int = 150) -> pd.DataFrame:
+        """通过腾讯金融高速接口拉取前复权真实日 K 线 (毫秒级响应无风控)"""
+        import urllib.request
+        import json
+
+        sym = str(symbol).zfill(6)
+        prefix = "sh" if sym.startswith(("60", "68")) else ("bj" if sym.startswith(("43", "83", "87", "92")) else "sz")
+        full_code = f"{prefix}{sym}"
+        url = f"https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param={full_code},day,,,{count},qfq"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+        try:
+            with urllib.request.urlopen(req, timeout=6) as resp:
+                data = json.loads(resp.read().decode("utf-8", errors="ignore"))
+                k_data = data.get("data", {}).get(full_code, {})
+                # 优先获取前复权序列 qfqday，若无则使用普通 day
+                day_k = k_data.get("qfqday", k_data.get("day", []))
+                if day_k:
+                    rows = []
+                    for item in day_k[-count:]:
+                        # 腾讯格式: [date, open, close, high, low, volume]
+                        if len(item) >= 6:
+                            rows.append({
+                                "date": str(item[0]),
+                                "open": float(item[1]),
+                                "close": float(item[2]),
+                                "high": float(item[3]),
+                                "low": float(item[4]),
+                                "volume": float(item[5]),
+                            })
+                    if rows:
+                        df = pd.DataFrame(rows).reset_index(drop=True)
+                        logger.info("成功通过腾讯金融通道获取 [%s] 真实日 K 线 %d 条", sym, len(df))
+                        return df
+        except Exception as e:
+            logger.debug("腾讯日 K 线通道获取异常: %s", str(e))
+        return pd.DataFrame()
+
     def fetch_stock_daily_kline(self, symbol: str, count: int = 150) -> pd.DataFrame:
         """获取指定股票近 count 个交易日的日 K 线历史数据
         
@@ -293,11 +330,16 @@ class DataFetcher:
         symbol = str(symbol).zfill(6)
         logger.info("获取个股 [%s] 的近 %d 根日 K 线数据...", symbol, count)
         
+        # 1. 优先使用腾讯金融高速日 K 线通道 (毫秒级响应、前复权无阻断)
+        tencent_k_df = self._fetch_tencent_daily_kline(symbol, count=count)
+        if not tencent_k_df.empty and len(tencent_k_df) >= min(10, count):
+            return tencent_k_df
+
+        # 2. 备选使用 AkShare 官方接口
         if self._ak_available:
             try:
                 start_date = (datetime.now() - timedelta(days=int(count * 1.6))).strftime("%Y%m%d")
                 end_date = datetime.now().strftime("%Y%m%d")
-                # 拉取前复权日 K 线
                 df = self._ak.stock_zh_a_hist(
                     symbol=symbol,
                     period="daily",
@@ -316,11 +358,12 @@ class DataFetcher:
                     }
                     result = df[list(rename_dict.keys())].rename(columns=rename_dict)
                     result["date"] = pd.to_datetime(result["date"]).dt.strftime("%Y-%m-%d")
-                    logger.info("成功获取 [%s] 日 K 线 %d 条", symbol, len(result))
+                    logger.info("成功获取 [%s] AkShare 日 K 线 %d 条", symbol, len(result))
                     return result.tail(count).reset_index(drop=True)
             except Exception as e:
                 logger.warning("拉取个股 [%s] 在线 K 线失败，切换到拟真离线数据: %s", symbol, str(e))
 
+        # 3. 兜底高仿真度生成器
         return self._generate_fallback_kline(symbol, count)
 
     def fetch_financial_summary(self, symbol: str) -> Dict[str, Any]:
@@ -413,20 +456,21 @@ class DataFetcher:
 
     def _generate_fallback_kline(self, symbol: str, count: int) -> pd.DataFrame:
         """为单股生成高仿真度几何布朗运动日 K 线"""
-        np.random.seed(int(symbol) % 10000)
-        base_price = 100.0 + (int(symbol) % 500)
-        dates = pd.date_range(end=datetime.now(), periods=count, freq="B")
+        seed_val = int(symbol) if symbol.isdigit() else 600519
+        np.random.seed(seed_val % 10000)
+        base_price = 10.0 + (seed_val % 200)
+        dates = pd.date_range(end=datetime.now(), periods=count, freq="D")
         
-        returns = np.random.normal(loc=0.0008, scale=0.02, size=count)
+        returns = np.random.normal(loc=0.0005, scale=0.018, size=count)
         price_series = base_price * np.exp(np.cumsum(returns))
 
         data = []
-        for i in range(count):
-            close = price_series[i]
-            change = close * np.random.uniform(-0.015, 0.015)
+        for i in range(min(count, len(dates), len(price_series))):
+            close = float(price_series[i])
+            change = close * float(np.random.uniform(-0.015, 0.015))
             open_p = close - change
-            high = max(open_p, close) + abs(close * np.random.uniform(0.001, 0.015))
-            low = min(open_p, close) - abs(close * np.random.uniform(0.001, 0.015))
+            high = max(open_p, close) + abs(close * float(np.random.uniform(0.001, 0.015)))
+            low = min(open_p, close) - abs(close * float(np.random.uniform(0.001, 0.015)))
             vol = int(np.random.uniform(20000, 250000))
             data.append({
                 "date": dates[i].strftime("%Y-%m-%d"),

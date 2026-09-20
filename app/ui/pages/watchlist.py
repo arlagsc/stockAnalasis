@@ -109,10 +109,24 @@ class WatchlistPage(QWidget):
             item_grp = QTableWidgetItem(grp)
             item_grp.setTextAlignment(Qt.AlignCenter)
 
-            # 操作按钮：移出自选
+            # 操作按钮组：研判直达 + 移出自选
+            action_widget = QWidget()
+            act_layout = QHBoxLayout(action_widget)
+            act_layout.setContentsMargins(4, 2, 4, 2)
+            act_layout.setSpacing(6)
+
+            btn_study = QPushButton("研判")
+            btn_study.setStyleSheet("background-color: #0284C7; color: #FFFFFF; font-weight: bold; padding: 3px 8px; border-radius: 4px;")
+            btn_study.clicked.connect(lambda _, s=sym: self.stock_selected.emit(s))
+
             btn_remove = QPushButton("移出")
             btn_remove.setObjectName("SecondaryButton")
+            btn_remove.setStyleSheet("padding: 3px 8px;")
             btn_remove.clicked.connect(lambda _, s=sym: self._on_remove_clicked(s))
+
+            act_layout.addWidget(btn_study)
+            act_layout.addWidget(btn_remove)
+            act_layout.addStretch()
 
             self.table.setItem(row_idx, 0, item_sym)
             self.table.setItem(row_idx, 1, item_name)
@@ -120,7 +134,7 @@ class WatchlistPage(QWidget):
             self.table.setItem(row_idx, 3, item_chg)
             self.table.setItem(row_idx, 4, item_to)
             self.table.setItem(row_idx, 5, item_grp)
-            self.table.setCellWidget(row_idx, 6, btn_remove)
+            self.table.setCellWidget(row_idx, 6, action_widget)
 
     def _on_add_clicked(self):
         """添加自选股"""
@@ -143,4 +157,15 @@ class WatchlistPage(QWidget):
         """双击直达研判"""
         item = self.table.item(row, 0)
         if item:
-            self.stock_selected.emit(item.text().strip())
+            sym = item.text().strip()
+            self.selected_symbol = sym
+            self.stock_selected.emit(sym)
+
+    def get_selected_symbol(self) -> str:
+        """获取当前高亮选中的自选股代码"""
+        curr_row = self.table.currentRow()
+        if curr_row >= 0:
+            item = self.table.item(curr_row, 0)
+            if item:
+                return item.text().strip()
+        return getattr(self, "selected_symbol", "")

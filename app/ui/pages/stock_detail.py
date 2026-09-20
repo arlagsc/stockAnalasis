@@ -70,12 +70,18 @@ class StockDetailPage(QWidget):
         top_bar.addWidget(self.lbl_price_info)
         top_bar.addStretch()
 
-        # 代码搜索框
+        # 代码搜索与即时切换框
         self.input_search = QLineEdit()
-        self.input_search.setPlaceholderText("输入股票代码切换...")
-        self.input_search.setFixedWidth(160)
+        self.input_search.setPlaceholderText("输入6位股票代码...")
+        self.input_search.setFixedWidth(140)
         self.input_search.returnPressed.connect(self._on_search_stock)
         top_bar.addWidget(self.input_search)
+
+        self.btn_search = QPushButton("切换")
+        self.btn_search.setObjectName("SecondaryButton")
+        self.btn_search.setFixedWidth(60)
+        self.btn_search.clicked.connect(self._on_search_stock)
+        top_bar.addWidget(self.btn_search)
 
         self.btn_fav = QPushButton("加入自选")
         self.btn_fav.setObjectName("SecondaryButton")
@@ -240,8 +246,9 @@ class StockDetailPage(QWidget):
             self.btn_fav.setText("已在自选")
 
     def _on_search_stock(self):
-        """手动搜索代码"""
+        """手动搜索代码并切换当前标的"""
         sym = self.input_search.text().strip()
         if sym:
+            sym = sym.zfill(6)
             self.load_stock(sym)
             self.input_search.clear()
