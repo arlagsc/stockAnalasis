@@ -1,0 +1,58 @@
+name: Build Cross-Platform Desktop App (Windows & macOS)
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact_name: StockAI-Windows-x64
+            target_path: dist/StockAI
+          - os: macos-latest
+            artifact_name: StockAI-macOS-Universal
+            target_path: dist/StockAI.app
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Build with PyInstaller
+        run: |
+          pyinstaller --clean stock_ai.spec
+
+      - name: Compress artifacts for distribution (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          Compress-Archive -Path dist/StockAI -DestinationPath dist/StockAI-Windows-x64.zip
+
+      - name: Compress artifacts for distribution (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          cd dist && zip -r StockAI-macOS.zip StockAI.app
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: |
+            dist/*.zip

@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+.env
+
+# PyInstaller / Build
+*.manifest
+*.spec.bak
+
+# 本地数据与敏感凭据 (千万不要提交至公共仓库)
+.secret.key
+credentials.enc
+*.db
+*.sqlite
+*.log
+settings.json
+
+# IDE
+.idea/
+.vscode/
+*.swp
