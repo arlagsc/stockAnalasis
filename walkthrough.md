@@ -296,11 +296,30 @@ graph TD
     - 用户提出在 iPhone 上使用 StockAI 并考虑 Sideloadly 侧载；经系统性头脑风暴深入探讨 iOS 封闭沙盒对桌面 PySide6 的限制及免费个人证书 7 天掉签痛点，最终锁定“方案 A：FastAPI 嵌入式服务 + 移动端响应式 PWA（添加到主屏幕）”。
   - **设计归档与架构规范 ([项目设计文档.md](file:///d:/AI/stockAnalasis/%E9%A1%B9%E7%9B%AE%E8%AE%BE%E8%AE%A1%E6%96%87%E6%A1%A3.md))**：
     - 正式追加第 8 章，明确单页移动端 UI、4 选项卡流式交互、ECharts 触控 K 线图表、FastAPI 接口与静态 PWA 资产一体化托管、局域网自发现与二维码扫码连接机制。
-- **2026-09-20 [Git 分支划分：存档桌面基线分支并切换至 master 开发分支]**：
-  - **分支策略与落地**：
-    - 将现有已发布的完整桌面端稳定代码拉取新分支 `desktop-v1.1` 进行基准封存，并推送至远程仓库 `origin/desktop-v1.1`；
-    - 确立特性开发分支 `master` 并检出，同步推送至远程仓库 `origin/master`（同时清理临时命名的远端分支）；
-    - 后续移动端 PWA 与新功能迭代在 `master` 分支上闭环进行，确保 `main` 与 `desktop-v1.1` 的绝对安全。
+- **2026-09-20 [iPhone 移动端 PWA 适配与局域网服务全套落地]**：
+  - **模块定位与架构复用**：
+    - 为满足用户在 iPhone 上无缝监控行情、研判自选与操盘建仓的诉求，在 `master` 分支全面落地 B/S 架构与 iOS PWA（添加到主屏幕）技术方案，彻底免除个人证书签名与 7 天掉签烦恼。
+  - **核心模块与编码实现**：
+    1. **后端 RESTful 异步服务 ([app/web/api.py](file:///d:/AI/stockAnalasis/app/web/api.py))**：
+       - 基于 FastAPI 构建，直接复用底层数据池、自选股、K 线计算与虚拟操盘；
+       - 包含四大核心指数与全市场涨跌统计（`/api/market/overview`）、自选股增删（`/api/watchlist`）、精选推荐（`/api/recommend`）、K 线指标（`/api/stock/{symbol}/kline`）、账户概况（`/api/trading/summary`）与市价买入、一键平仓（`/api/trading/buy`, `/api/trading/close`）；
+       - 挂载静态资源目录 `app/web/static/`。
+    2. **局域网探针与二维码服务 ([app/web/server.py](file:///d:/AI/stockAnalasis/app/web/server.py))**：
+       - 自动探查本机真实活跃局域网 IP，生成终端 ASCII 二维码与供桌面渲染的 Base64 PNG 图片；
+       - 提供独立主进程阻塞启动与非阻塞后台守护线程双启动模式。
+    3. **移动端 PWA 前端单页 ([app/web/static/](file:///d:/AI/stockAnalasis/app/web/static/))**：
+       - 视口深度适配 iPhone 刘海、灵动岛与底部 Home Indicator 安全区（`safe-area-inset`）；
+       - 4 大 Tab 流式触控切换（大盘自选、智能推荐、个股研判、虚拟操盘）；
+       - 高性能 HTML5 Canvas 自绘 50 日交互式 K 线（红涨绿跌蜡烛图 + MA5 均线）；
+       - 底部呼出式买入建仓抽屉，支持从自选股快捷下拉点选并自动联动回填代码；
+       - 包含标准 `manifest.json` 与 192x192 / 512x512 高清深色金融图标。
+    4. **启动引导与桌面客户端无缝联动**：
+       - 根目录提供命令行独立启动入口 [`run_mobile_server.py`](file:///d:/AI/stockAnalasis/run_mobile_server.py)；
+       - 在桌面端系统设置 ([app/ui/pages/settings.py](file:///d:/AI/stockAnalasis/app/ui/pages/settings.py)) 中新增移动端服务控制卡片，一键启停并在界面展示高清专属二维码与局域网 IP。
+  - **测试与实机视觉核验**：
+    - 编写并执行自动化测试套件 `tests/test_mobile_api.py`，涵盖系统状态、大盘多空、自选股、操盘账户与 PWA 静态资源，10 项自动化测试全量通过；
+    - 使用 Playwright 模拟 iPhone 14 Pro 视口（393 x 852），对市场自选、智能推荐、个股研判与虚拟操盘 4 个页面全部完成实机渲染截图核验，界面优雅饱满、交互流畅无溢出。
+
 
 
 

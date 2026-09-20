@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>StockAI 智能分析终端</title>
+  <!-- 核心 iOS PWA 移动视口与状态栏声明 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="StockAI">
+  <meta name="theme-color" content="#0A0D14">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+  <!-- 顶部状态栏 -->
+  <header class="mobile-header">
+    <div class="brand-title">
+      📈 StockAI <span class="app-badge">PWA</span>
+    </div>
+    <div class="header-status">
+      <span class="status-dot"></span>
+      <span>局域网已就绪</span>
+    </div>
+  </header>
+
+  <!-- 吐司通知组件 -->
+  <div id="toast" style="display:none; position:fixed; top:70px; left:50%; transform:translateX(-50%); background:rgba(2,132,199,0.95); color:#FFF; padding:8px 18px; border-radius:20px; font-size:13px; font-weight:700; z-index:999; box-shadow:0 4px 16px rgba(0,0,0,0.5); transition:opacity 0.3s ease;"></div>
+
+  <!-- TAB 1: 市场与自选 -->
+  <main id="tab-market" class="tab-content active">
+    <div class="section-header">
+      <div class="section-title">全市场核心指数</div>
+      <button class="btn-icon" onclick="loadMarketOverview()">刷新行情</button>
+    </div>
+    <div id="indices-grid" class="indices-grid">
+      <!-- 动态填充四大指数 -->
+    </div>
+
+    <!-- 全市场多空条 -->
+    <div class="market-breadth-card">
+      <div class="breadth-stats">
+        <span id="stat-up" class="color-up">-- 涨</span>
+        <span id="stat-avg" style="color:var(--text-secondary);">全市场平均: --%</span>
+        <span id="stat-down" class="color-down">-- 跌</span>
+      </div>
+      <div class="breadth-bar">
+        <div id="bar-up" class="breadth-up" style="width: 50%;"></div>
+        <div id="bar-down" class="breadth-down" style="width: 50%;"></div>
+      </div>
+    </div>
+
+    <!-- 我的自选股池 -->
+    <div class="section-header">
+      <div class="section-title">⭐ 我的自选池</div>
+      <button class="btn-icon" onclick="openAddWatchlistPrompt()">+ 加自选</button>
+    </div>
+    <div id="watchlist-container">
+      <!-- 动态填充自选卡片 -->
+    </div>
+  </main>
+
+  <!-- TAB 2: 智能推荐 -->
+  <main id="tab-recommend" class="tab-content">
+    <div class="section-header">
+      <div class="section-title">🎯 AI 智能精选推荐</div>
+      <button class="btn-icon" onclick="loadRecommendations()">重新生成</button>
+    </div>
+    <div class="stock-extra" id="recommend-summary" style="margin-bottom: 12px; color: var(--accent-cyan);">
+      两阶段漏斗多因子量化模型驱动
+    </div>
+    <div id="recommend-container">
+      <!-- 动态填充推荐卡片流 -->
+    </div>
+  </main>
+
+  <!-- TAB 3: 个股深度研判 -->
+  <main id="tab-detail" class="tab-content">
+    <div class="section-header">
+      <div id="detail-title" class="section-title">个股深度研判</div>
+    </div>
+    
+    <!-- 顶部自选股下拉快捷切换 -->
+    <div class="form-group">
+      <select id="detail-watchlist-select" class="form-select">
+        <option value="">-- 从自选股中快速选择 --</option>
+      </select>
+    </div>
+
+    <!-- 交互式 K 线图表 -->
+    <div class="chart-container">
+      <canvas id="kline-canvas" class="kline-canvas"></canvas>
+    </div>
+
+    <div class="section-header" style="margin-top: 16px;">
+      <div class="section-title">量化与基本面诊断快照</div>
+    </div>
+    <div class="recommend-card">
+      <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.6;">
+        <div>• 均线形态：MA5 / MA10 / MA20 趋势追踪中</div>
+        <div>• 交易纪律：触控支持移动端顺畅横滑，多因子评分体系持续盯盘</div>
+        <div>• 研报状态：大模型可解释性推理通道就绪</div>
+      </div>
+      <button class="btn-primary" style="margin-top: 10px;" onclick="quickBuyFromCard(state.currentSymbol)">以此标的模拟买入建仓</button>
+    </div>
+  </main>
+
+  <!-- TAB 4: 虚拟操盘 -->
+  <main id="tab-trade" class="tab-content">
+    <!-- 资产面板 -->
+    <div class="portfolio-banner">
+      <div class="portfolio-label">人类主观操盘账户总资产</div>
+      <div id="trade-total-asset" class="portfolio-total">-- 元</div>
+      <div class="portfolio-grid">
+        <div>
+          <div class="sub-stat-label">浮动盈亏</div>
+          <div id="trade-float-pnl" class="sub-stat-val">--</div>
+        </div>
+        <div>
+          <div class="sub-stat-label">可用现金</div>
+          <div id="trade-cash" class="sub-stat-val">--</div>
+        </div>
+        <div>
+          <div class="sub-stat-label">持仓市值</div>
+          <div id="trade-holding-val" class="sub-stat-val">--</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 当前持仓 -->
+    <div class="section-header">
+      <div class="section-title">💼 当前持仓明细</div>
+      <button class="btn-icon" onclick="loadTradingData()">刷新价格</button>
+    </div>
+    <div id="positions-container">
+      <!-- 动态持仓卡片 -->
+    </div>
+
+    <!-- 悬浮买入建仓按钮 -->
+    <button class="fab-btn" onclick="openBuyModal()">
+      <span>➕ 模拟买入</span>
+    </button>
+  </main>
+
+  <!-- 模拟买入建仓模态抽屉 (Bottom Sheet) -->
+  <div id="buy-modal" class="modal-overlay" onclick="if(event.target===this)closeBuyModal()">
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <div class="modal-title">📈 模拟买入建仓</div>
+        <button class="modal-close" onclick="closeBuyModal()">&times;</button>
+      </div>
+      <div class="form-group">
+        <label class="form-label">从自选股快速点选</label>
+        <select id="buy-watchlist-select" class="form-select">
+          <option value="">-- 点击选择自选标的 --</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">股票代码 (6位)</label>
+        <input id="buy-symbol-input" class="form-input" placeholder="例如 600519 或 002429" maxlength="6">
+      </div>
+      <div class="form-group">
+        <label class="form-label">买入股数 (必须为 100 整数倍)</label>
+        <input id="buy-amount-input" type="number" class="form-input" value="100" step="100" min="100">
+      </div>
+      <div class="form-group">
+        <label class="form-label">建仓战术理由</label>
+        <input id="buy-reason-input" class="form-input" value="手机端逢低伏击建仓">
+      </div>
+      <button class="btn-primary" onclick="submitBuyOrder()">确认以最新市价成交</button>
+    </div>
+  </div>
+
+  <!-- 底部固定导航栏 (iOS Tab Bar) -->
+  <nav class="mobile-nav">
+    <div class="nav-item active" data-tab="tab-market">
+      <div class="nav-icon">📊</div>
+      <div class="nav-text">市场自选</div>
+    </div>
+    <div class="nav-item" data-tab="tab-recommend">
+      <div class="nav-icon">🎯</div>
+      <div class="nav-text">精选推荐</div>
+    </div>
+    <div class="nav-item" data-tab="tab-detail">
+      <div class="nav-icon">🔍</div>
+      <div class="nav-text">个股研判</div>
+    </div>
+    <div class="nav-item" data-tab="tab-trade">
+      <div class="nav-icon">💼</div>
+      <div class="nav-text">虚拟操盘</div>
+    </div>
+  </nav>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>

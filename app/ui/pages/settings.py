@@ -246,7 +246,55 @@ class SettingsPage(QWidget):
         data_layout.addLayout(data_btn_box)
         layout.addWidget(data_card)
 
-        # 6. 法律合规与免责声明卡片
+        # 6. iPhone 移动端局域网服务与 PWA 扫码连接卡片
+        mobile_card = QFrame()
+        mobile_card.setObjectName("CardPanel")
+        mob_layout = QVBoxLayout(mobile_card)
+        mob_layout.setContentsMargins(18, 16, 18, 16)
+        mob_layout.setSpacing(10)
+
+        lbl_mob_head = QLabel("📱 iPhone 移动端局域网服务 (PWA)")
+        lbl_mob_head.setStyleSheet("font-size: 15px; font-weight: bold; color: #38BDF8;")
+        mob_layout.addWidget(lbl_mob_head)
+
+        lbl_mob_desc = QLabel(
+            "开启后，同一 Wi-Fi 局域网内的 iPhone 设备可使用相机扫码直达移动端 Web，\n"
+            "在 Safari 浏览器中点击「分享 -> 添加到主屏幕」即可作为独立全屏 App 使用。"
+        )
+        lbl_mob_desc.setStyleSheet("color: #94A3B8; font-size: 12px; line-height: 1.5;")
+        mob_layout.addWidget(lbl_mob_desc)
+
+        mob_ctrl_box = QHBoxLayout()
+        self.btn_toggle_mobile_server = QPushButton("启动移动端服务")
+        self.btn_toggle_mobile_server.setStyleSheet("background: #0284C7; font-weight: bold;")
+        self.btn_toggle_mobile_server.clicked.connect(self._on_toggle_mobile_server)
+        mob_ctrl_box.addWidget(self.btn_toggle_mobile_server)
+
+        self.lbl_mob_url = QLabel("服务未启动")
+        self.lbl_mob_url.setStyleSheet("color: #64748B; font-size: 13px; font-weight: bold;")
+        mob_ctrl_box.addWidget(self.lbl_mob_url)
+        mob_ctrl_box.addStretch()
+        mob_layout.addLayout(mob_ctrl_box)
+
+        # 二维码展示区
+        self.qr_box = QHBoxLayout()
+        self.lbl_qr_image = QLabel()
+        self.lbl_qr_image.setFixedSize(140, 140)
+        self.lbl_qr_image.setStyleSheet("border: 1px dashed #334155; border-radius: 8px; background: #0F1115;")
+        self.lbl_qr_image.setAlignment(Qt.AlignCenter)
+        self.lbl_qr_image.setText("扫码区域")
+        self.qr_box.addWidget(self.lbl_qr_image)
+
+        self.lbl_qr_tips = QLabel("服务启动后将在此处自动生成专属二维码，使用 iPhone 相机对准即可打开。")
+        self.lbl_qr_tips.setStyleSheet("color: #64748B; font-size: 11px;")
+        self.lbl_qr_tips.setWordWrap(True)
+        self.qr_box.addWidget(self.lbl_qr_tips)
+        self.qr_box.addStretch()
+        mob_layout.addLayout(self.qr_box)
+
+        layout.addWidget(mobile_card)
+
+        # 7. 法律合规与免责声明卡片
         disclaimer_card = QFrame()
         disclaimer_card.setObjectName("CardPanel")
         dis_layout = QVBoxLayout(disclaimer_card)
@@ -464,3 +512,48 @@ class SettingsPage(QWidget):
         """强制同步全量数据"""
         cache_manager.sync_stocks_from_source()
         QMessageBox.information(self, "成功", "全市场股票数据已重新同步入库！")
+
+    def _on_toggle_mobile_server(self):
+        """切换移动端局域网 Web 服务的启停状态"""
+        from app.web.server import mobile_server
+        if mobile_server.is_running():
+            mobile_server.stop()
+            self._update_mobile_server_ui(False)
+        else:
+            mobile_server.start(host="0.0.0.0", port=8000, blocking=False)
+            self._update_mobile_server_ui(True)
+
+    def _update_mobile_server_ui(self, is_running: bool):
+        """更新移动端服务的界面按钮状态、URL 及二维码"""
+        from app.web.server import mobile_server
+        from PySide6.QtGui import QPixmap, QImage
+        import base64
+
+        if is_running:
+            lan_url, _ = mobile_server.get_access_urls(8000)
+            self.btn_toggle_mobile_server.setText("停止移动端服务")
+            self.btn_toggle_mobile_server.setStyleSheet("background: #DC2626; font-weight: bold;")
+            self.lbl_mob_url.setText(f"运行中: {lan_url}")
+            self.lbl_mob_url.setStyleSheet("color: #10B981; font-size: 13px; font-weight: bold;")
+            
+            # 生成并显示二维码
+            try:
+                b64_img = mobile_server.generate_qr_base64(lan_url)
+                # 去掉 data:image/png;base64, 前缀
+                b64_data = b64_img.split(",", 1)[1]
+                raw_bytes = base64.b64decode(b64_data)
+                qimg = QImage.fromData(raw_bytes)
+                pix = QPixmap.fromImage(qimg).scaled(140, 140, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                self.lbl_qr_image.setPixmap(pix)
+                self.lbl_qr_tips.setText(f"iPhone 扫码链接: {lan_url}\n请确保手机与电脑连入同一 Wi-Fi 路由器。在 Safari 中点击「分享 -> 添加到主屏幕」即可作为独立 App 运行。")
+            except Exception as e:
+                self.lbl_qr_tips.setText(f"二维码生成异常: {e}")
+        else:
+            self.btn_toggle_mobile_server.setText("启动移动端服务")
+            self.btn_toggle_mobile_server.setStyleSheet("background: #0284C7; font-weight: bold;")
+            self.lbl_mob_url.setText("服务未启动")
+            self.lbl_mob_url.setStyleSheet("color: #64748B; font-size: 13px; font-weight: bold;")
+            self.lbl_qr_image.clear()
+            self.lbl_qr_image.setText("扫码区域")
+            self.lbl_qr_tips.setText("服务启动后将在此处自动生成专属二维码，使用 iPhone 相机对准即可打开。")
+
