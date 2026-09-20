@@ -181,6 +181,13 @@ QTableWidget::item:hover, QTableView::item:hover {
     background-color: #222836;
     color: #FFFFFF;
 }
+QTableWidget QPushButton, QTableView QPushButton {
+    min-height: 24px;
+    max-height: 28px;
+    padding: 2px 8px;
+    font-size: 12px;
+    border-radius: 4px;
+}
 QHeaderView::section {
     background-color: #161922;
     color: #CBD5E1;

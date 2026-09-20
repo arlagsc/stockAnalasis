@@ -79,6 +79,7 @@ class DashboardPage(QWidget):
             "股票代码", "股票简称", "最新价(元)", "涨跌幅", "成交量(手)", "换手率", "市盈率(TTM)", "总市值(亿)"
         ])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table.verticalHeader().setDefaultSectionSize(36)
         self.table.setAlternatingRowColors(True)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)

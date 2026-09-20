@@ -225,4 +225,29 @@ graph TD
   - **实机测试与验证**：
     - 编写自动化测试脚本，验证下拉框选项加载、正向点选自动回填、反向输入文本同步高亮逻辑全部正常；
     - 实机渲染截图验证：深色金融底色下标签与下拉框对比度锐利，回填即时生效。
+- **2026-09-20 [修复表格操作列按钮显示不全与行高挤压缺陷]**：
+  - **缺陷背景与根因定位**：
+    - 用户反馈【我的自选股票池】与【虚拟操盘】持仓明细表格中，最后一列操作按钮（“研判”、“移出”、“平仓”）文字严重被上下和左右挤压，呈现扁平条状且文字只露出一半。
+    - 经深入排查，根本原因包括：
+      1. 全局 `QPushButton` 默认样式内边距较大（`padding: 7px 16px`），而 `QTableWidget` 默认行高仅 24~28 px，单元格可用垂直空间严重不足，导致按钮被强行上下裁切；
+      2. 表格表头所有列均默认使用 `QHeaderView.Stretch` 等比缩放，窗口稍窄或列数较多时，最后一列分配到的像素不足 100 px，横向容纳两个带内边距的按钮时发生叠压挤扁；
+      3. 按钮未显式限制固定尺寸与布局居中对齐方式。
+  - **优化与修复方案**：
+    1. **主题样式层精确覆盖 ([app/ui/theme.py](file:///d:/AI/stockAnalasis/app/ui/theme.py))**：
+       - 在深色金融主题 QSS 中增加 `QTableWidget QPushButton, QTableView QPushButton` 专项规则，设置 `min-height: 24px; max-height: 28px; padding: 2px 8px; font-size: 12px; border-radius: 4px;`，彻底解除全局大按钮内边距对表格嵌入按钮的样式污染。
+    2. **自选股表格布局规范 ([app/ui/pages/watchlist.py](file:///d:/AI/stockAnalasis/app/ui/pages/watchlist.py))**：
+       - 提高表格默认行高：`verticalHeader().setDefaultSectionSize(40)`；
+       - 操作列显式锁定宽度：`horizontalHeader().setSectionResizeMode(6, QHeaderView.Fixed)` 并设为 140 px，避免被其他列压缩；
+       - 操作容器内按钮显式设置 `setFixedSize(54, 26)`，内边距设为 0，水平垂直居中对齐。
+    3. **虚拟操盘持仓明细与军规表优化 ([app/ui/pages/virtual_trading.py](file:///d:/AI/stockAnalasis/app/ui/pages/virtual_trading.py))**：
+       - 持仓明细表行高设为 40 px，操作列锁定宽度 140 px；
+       - “平仓”与“研判”按钮显式设置 `setFixedSize(54, 26)`，文字居中饱满呈现；
+       - 操盘军规激活状态列锁定宽度 100 px，行高设为 42 px，激活按钮设为固定尺寸 `setFixedSize(70, 26)`；
+       - 历史成交流水表行高同步优化为 36 px。
+    4. **大盘看板与智能筛选表格一致性 ([app/ui/pages/dashboard.py](file:///d:/AI/stockAnalasis/app/ui/pages/dashboard.py), [app/ui/pages/screener.py](file:///d:/AI/stockAnalasis/app/ui/pages/screener.py))**：
+       - 统一将数据行高设定为 36 px，彻底规避因默认行高不足导致的文本垂直挤压问题。
+  - **实机测试与视觉核验**：
+    - 实机截图捕获自选股列表与虚拟操盘持仓表，核验操作列按钮在深色金融终端下居中对齐、字号适中、左右留白充裕、文字 100% 完整显示无裁切；
+    - 执行全量自动化测试用例，所有测试 100% 通过。
+
 

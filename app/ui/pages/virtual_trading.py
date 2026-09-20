@@ -419,6 +419,10 @@ class VirtualTradingPage(QWidget):
             "股票代码", "股票简称", "总持股(股)", "今日可卖(T+1)", "持仓均价", "最新现价", "持仓市值(元)", "浮动盈亏", "操作"
         ])
         self.table_pos.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table_pos.horizontalHeader().setSectionResizeMode(8, QHeaderView.Fixed)
+        self.table_pos.setColumnWidth(8, 140)
+        self.table_pos.verticalHeader().setDefaultSectionSize(40)
+        self.table_pos.setAlternatingRowColors(True)
         self.table_pos.setSelectionBehavior(QTableWidget.SelectRows)
         self.table_pos.setEditTriggers(QTableWidget.NoEditTriggers)
         l_tab_pos.addWidget(self.table_pos)
@@ -434,6 +438,8 @@ class VirtualTradingPage(QWidget):
             "成交时间", "账户", "代码", "简称", "方向", "成交价", "成交量", "手续费(税)", "平仓收益/理由"
         ])
         self.table_trades.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table_trades.verticalHeader().setDefaultSectionSize(36)
+        self.table_trades.setAlternatingRowColors(True)
         self.table_trades.setSelectionBehavior(QTableWidget.SelectRows)
         self.table_trades.setEditTriggers(QTableWidget.NoEditTriggers)
         l_tab_trades.addWidget(self.table_trades)
@@ -474,7 +480,10 @@ class VirtualTradingPage(QWidget):
         self.table_skills.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
         self.table_skills.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
         self.table_skills.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)
-        self.table_skills.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeToContents)
+        self.table_skills.horizontalHeader().setSectionResizeMode(5, QHeaderView.Fixed)
+        self.table_skills.setColumnWidth(5, 100)
+        self.table_skills.verticalHeader().setDefaultSectionSize(42)
+        self.table_skills.setAlternatingRowColors(True)
         l_tab_skills.addWidget(self.table_skills)
 
         self.tabs.addTab(tab_skills, "💡 沉淀操盘 Skill 知识库")
@@ -611,20 +620,22 @@ class VirtualTradingPage(QWidget):
             # 操作按钮组：平仓 / 研判
             act_w = QWidget()
             l_act = QHBoxLayout(act_w)
-            l_act.setContentsMargins(2, 2, 2, 2)
-            l_act.setSpacing(4)
+            l_act.setContentsMargins(4, 2, 4, 2)
+            l_act.setSpacing(8)
+            l_act.setAlignment(Qt.AlignCenter)
 
             btn_sell = QPushButton("平仓")
-            btn_sell.setStyleSheet("background-color: #DC2626; color: #FFFFFF; font-weight: bold; border-radius: 3px; padding: 2px 6px;")
+            btn_sell.setFixedSize(54, 26)
+            btn_sell.setStyleSheet("background-color: #DC2626; color: #FFFFFF; font-weight: bold; border-radius: 4px; font-size: 12px; padding: 0px;")
             btn_sell.clicked.connect(lambda _, a=acc_type, s=sym, n=name, av=avail: self._on_sell_clicked(a, s, n, av))
-            
+
             btn_study = QPushButton("研判")
-            btn_study.setStyleSheet("background-color: #0284C7; color: #FFFFFF; border-radius: 3px; padding: 2px 6px;")
+            btn_study.setFixedSize(54, 26)
+            btn_study.setStyleSheet("background-color: #0284C7; color: #FFFFFF; font-weight: bold; border-radius: 4px; font-size: 12px; padding: 0px;")
             btn_study.clicked.connect(lambda _, s=sym: self.stock_selected.emit(s))
 
             l_act.addWidget(btn_sell)
             l_act.addWidget(btn_study)
-            l_act.addStretch()
             self.table_pos.setCellWidget(row_idx, 8, act_w)
 
     def _on_sell_clicked(self, acc_type: str, symbol: str, name: str, available_amount: int):
@@ -754,10 +765,17 @@ class VirtualTradingPage(QWidget):
             item_from.setForeground(QColor("#94A3B8"))
             self.table_skills.setItem(row_idx, 4, item_from)
             
+            btn_w = QWidget()
+            l_btn = QHBoxLayout(btn_w)
+            l_btn.setContentsMargins(4, 2, 4, 2)
+            l_btn.setAlignment(Qt.AlignCenter)
+
             btn_toggle = QPushButton("已激活" if s["is_active"] else "已停用")
-            btn_toggle.setStyleSheet("background-color: #10B981; color: #FFFFFF; font-weight: bold; border-radius: 3px; padding: 2px 6px;" if s["is_active"] else "background-color: #64748B; color: #FFFFFF; border-radius: 3px; padding: 2px 6px;")
+            btn_toggle.setFixedSize(70, 26)
+            btn_toggle.setStyleSheet("background-color: #10B981; color: #FFFFFF; font-weight: bold; border-radius: 4px; font-size: 12px; padding: 0px;" if s["is_active"] else "background-color: #64748B; color: #FFFFFF; border-radius: 4px; font-size: 12px; padding: 0px;")
             btn_toggle.clicked.connect(lambda _, sid=s["id"], act=s["is_active"]: self._on_toggle_skill(sid, act))
-            self.table_skills.setCellWidget(row_idx, 5, btn_toggle)
+            l_btn.addWidget(btn_toggle)
+            self.table_skills.setCellWidget(row_idx, 5, btn_w)
 
     def _on_toggle_skill(self, skill_id: int, current_active: bool):
         skill_engine.toggle_skill_active(skill_id, not current_active)

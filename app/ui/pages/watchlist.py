@@ -69,6 +69,9 @@ class WatchlistPage(QWidget):
             "股票代码", "股票简称", "最新价(元)", "今日涨跌", "换手率", "所属分组", "操作"
         ])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(6, QHeaderView.Fixed)
+        self.table.setColumnWidth(6, 140)
+        self.table.verticalHeader().setDefaultSectionSize(40)
         self.table.setAlternatingRowColors(True)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
@@ -124,20 +127,22 @@ class WatchlistPage(QWidget):
             action_widget = QWidget()
             act_layout = QHBoxLayout(action_widget)
             act_layout.setContentsMargins(4, 2, 4, 2)
-            act_layout.setSpacing(6)
+            act_layout.setSpacing(8)
+            act_layout.setAlignment(Qt.AlignCenter)
 
             btn_study = QPushButton("研判")
-            btn_study.setStyleSheet("background-color: #0284C7; color: #FFFFFF; font-weight: bold; padding: 3px 8px; border-radius: 4px;")
+            btn_study.setFixedSize(54, 26)
+            btn_study.setStyleSheet("background-color: #0284C7; color: #FFFFFF; font-weight: bold; border-radius: 4px; font-size: 12px; padding: 0px;")
             btn_study.clicked.connect(lambda _, s=sym: self.stock_selected.emit(s))
 
             btn_remove = QPushButton("移出")
+            btn_remove.setFixedSize(54, 26)
             btn_remove.setObjectName("SecondaryButton")
-            btn_remove.setStyleSheet("padding: 3px 8px;")
+            btn_remove.setStyleSheet("background-color: #1E293B; color: #CBD5E1; border: 1px solid #334155; border-radius: 4px; font-size: 12px; padding: 0px;")
             btn_remove.clicked.connect(lambda _, s=sym: self._on_remove_clicked(s))
 
             act_layout.addWidget(btn_study)
             act_layout.addWidget(btn_remove)
-            act_layout.addStretch()
 
             self.table.setItem(row_idx, 0, item_sym)
             self.table.setItem(row_idx, 1, item_name)
