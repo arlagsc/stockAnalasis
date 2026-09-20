@@ -15,13 +15,17 @@ from PyInstaller.utils.hooks import collect_submodules, collect_data_files
 
 block_cipher = None
 
-# 1. 收集关键运行数据文件（特别是 SSL 根证书，保障免安装电脑上 HTTPS 正常请求）
+# 1. 收集关键运行数据文件（特别是 SSL 根证书与全市场股票基础池索引）
 datas = []
 try:
     import certifi
     datas.append((certifi.where(), 'certifi'))
 except Exception:
     pass
+
+universe_file = os.path.join('app', 'data', 'stocks_universe.json')
+if os.path.exists(universe_file):
+    datas.append((universe_file, os.path.join('app', 'data')))
 
 # 2. 收集全量关键库隐式依赖，防止动态加载丢失
 hidden_imports = [

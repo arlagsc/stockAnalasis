@@ -84,13 +84,13 @@ graph TD
   - `ScreenerService`：自然语言（NL-to-Filter）成功编译为结构化过滤规则并在本地内存矩阵执行筛选。
   - `RecommendService`：多因子打分与推荐引擎成功生成 Top 3 推荐标的与可解释归因理由。
   - `DataFetcher`：验证三级重试与网络抖动下的离线拟真股票池降级保护机制，系统具备高抗风险韧性。
-- **2026-09-20 [跨平台打包与独立分发完成]**：
-  - **Windows 独立运行包编译成功**：产物位于 `dist/StockAI/`，主程序为 `StockAI.exe`，自包含完整 Python 运行时、PySide6 图形库与 SSL 根证书；已生成便携压缩包 `dist/StockAI-Windows-x64.zip` (283 MB)，可在任意未装 Python 的 Windows 电脑上解压即用。
-  - **实机运行启动验证**：自动化测试拉起打包后的 `StockAI.exe`，进程成功载入内存并在后台平稳运行，无缺失 DLL 或闪退。
-  - **macOS 与跨平台 CI/CD 支持**：重构 [stock_ai.spec](file:///d:/AI/stockAnalasis/stock_ai.spec) 自动支持 macOS 下生成 `.app` 捆绑包；新增 [.github/workflows/build_release.yml](file:///d:/AI/stockAnalasis/.github/workflows/build_release.yml) 实现 GitHub Actions 双平台云端自动化编译打包；编写了 [打包与跨平台分发说明.md](file:///d:/AI/stockAnalasis/%E6%89%93%E5%8C%85%E4%B8%8E%E8%B7%A8%E5%B9%B3%E5%8F%B0%E5%88%86%E5%8F%91%E8%AF%B4%E6%98%8E.md)。
-
-
-
-
-
-
+- **2026-09-20 [Git 仓库托管与 GitHub Actions 云端打包触发]**：
+  - 代码全量初始化并绑定远程仓库：`https://github.com/arlagsc/stockAnalasis.git`。
+  - 配置专业 `.gitignore` 过滤构建缓存与私钥，成功推送至 `main` 主分支。
+  - GitHub Actions 跨平台 CI/CD 流水线 ([build_release.yml](file:///d:/AI/stockAnalasis/.github/workflows/build_release.yml)) 已自动触发，云端正在使用真实的 macOS 与 Windows 虚拟机编译全依赖应用包并生成 Artifacts。
+- **2026-09-20 [全量 A 股数据源故障排查与高速通道重构]**：
+  - **问题根因**：东方财富接口近期实施 WAF 策略阻断（返回 502 Bad Gateway / Connection Reset），导致原采集器在 3 次重试失败后触发兜底逻辑；原内置兜底股票池仅定义了 15 支代表性标的，导致强制全量同步后看板仅展示 15 支。
+  - **全量代码池索引建立**：从上交所主板、科创板、深交所及北交所提取完整证券名录，生成全量 5,565 支 A 股基础池索引文件 [`app/data/stocks_universe.json`](file:///d:/AI/stockAnalasis/app/data/stocks_universe.json)，并纳入 [`stock_ai.spec`](file:///d:/AI/stockAnalasis/stock_ai.spec) 打包资源。
+  - **接入腾讯高速金融通道**：在 [`app/data/fetcher.py`](file:///d:/AI/stockAnalasis/app/data/fetcher.py) 中实现 `_fetch_tencent_realtime_basics`，采用 80 股批量分组与 12 线程并发查询，10 秒内即可拉取全市场 5,565 支股票的实时价格、涨跌幅、成交量、换手率、PE、PB 与总市值。
+  - **兜底方案升级**：重构 `_generate_fallback_basics`，若处于完全离线状态，基于全量 5,565 支标的代码池生成一致性拟真数据，彻底消除股票数量缩水问题。
+  - **实测验证**：本地 SQLite 数据库 [`StockBasic`](file:///d:/AI/stockAnalasis/app/core/database.py) 成功同步落盘 5,565 条真实记录；大盘看板顶部卡片准确显示覆盖标的总数 5,565 支，全市场股票表格分页与排序运作正常。
