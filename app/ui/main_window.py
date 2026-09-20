@@ -123,6 +123,12 @@ class MainWindow(QMainWindow):
         self.page_recommend.stock_selected.connect(self._navigate_to_stock_detail)
         # 虚拟操盘持仓研判 -> 跳转个股详情
         self.page_virtual_trading.stock_selected.connect(self._navigate_to_stock_detail)
+        # 系统设置大模型切换 -> 更新状态栏
+        self.page_settings.provider_configured.connect(self._on_provider_configured)
+
+    def _on_provider_configured(self, provider_name: str):
+        """响应模型服务商配置切换，动态刷新底部状态栏"""
+        self.statusBar.showMessage(f"就绪 | 当前模型后端: {provider_name} | 数据源: AkShare 混合缓存 | 仅供研究参考，不构成投资建议")
 
     def switch_page(self, index: int):
         """切换显示的视图页面并高亮对应侧边栏按钮"""

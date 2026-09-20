@@ -72,6 +72,8 @@ class LLMSandboxWorker(QThread):
 class SettingsPage(QWidget):
     """系统配置、API 凭据管理与大模型测试套件页面"""
 
+    provider_configured = Signal(str)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self._test_worker: Optional[LLMTestWorker] = None
@@ -266,7 +268,11 @@ class SettingsPage(QWidget):
         scroll.setWidget(content_widget)
         main_layout.addWidget(scroll)
 
-        # 加载初始数据
+        # 加载初始数据：自动恢复上次持久化保存的活跃服务商
+        if config.current_provider_name in config.default_providers:
+            idx = self.combo_provider.findText(config.current_provider_name)
+            if idx >= 0:
+                self.combo_provider.setCurrentIndex(idx)
         self._load_current_provider_settings()
 
     def _load_current_provider_settings(self):
@@ -276,13 +282,16 @@ class SettingsPage(QWidget):
         if provider_conf:
             self.input_base_url.setText(provider_conf.base_url)
             self.input_model_name.setText(provider_conf.model_name)
-            
+
             # 读取已保存的 Key
             keys = security_manager.load_api_keys()
             self.input_api_key.setText(keys.get(provider_name, ""))
 
     def _on_provider_changed(self, text: str):
-        config.current_provider_name = text
+        if text in config.default_providers:
+            config.current_provider_name = text
+            config.save_settings()
+            self.provider_configured.emit(text)
         self._load_current_provider_settings()
         self._reset_diagnostic_ui()
 
@@ -393,6 +402,9 @@ class SettingsPage(QWidget):
         base_url = self.input_base_url.text().strip()
         model_name = self.input_model_name.text().strip()
 
+        # 更新当前活跃服务商
+        config.current_provider_name = provider
+
         # 更新内存配置
         if provider in config.default_providers:
             config.default_providers[provider].base_url = base_url
@@ -403,7 +415,13 @@ class SettingsPage(QWidget):
         keys[provider] = key
         security_manager.save_api_keys(keys)
 
-        QMessageBox.information(self, "保存成功", f"服务商 [{provider}] 的配置与 API Key 已安全加密存储！")
+        # 全量持久化至本地 settings.json
+        config.save_settings()
+
+        # 通知全局当前模型已切换
+        self.provider_configured.emit(provider)
+
+        QMessageBox.information(self, "保存成功", f"服务商 [{provider}] 的配置与 API Key 已持久化保存并立即生效！")
 
     def _on_fetch_models_clicked(self):
         """自动请求端点 /v1/models 探测可用模型列表并自动填充"""

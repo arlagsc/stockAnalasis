@@ -37,6 +37,7 @@ class AppConfig:
             cls._instance._init_paths()
             cls._instance._init_defaults()
             cls._instance._setup_logging()
+            cls._instance.load_settings()
         return cls._instance
 
     def _init_paths(self):
@@ -123,6 +124,57 @@ class AppConfig:
 
         self.logger = logger
         self.logger.info("StockAI 全局配置初始化完成。数据存储路径: %s", self.data_dir)
+
+    def load_settings(self):
+        """从本地 settings.json 文件加载用户持久化配置"""
+        import json
+        if not self.config_json_path.exists():
+            return
+        try:
+            with open(self.config_json_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            saved_provider = data.get("current_provider_name")
+            if saved_provider and saved_provider in self.default_providers:
+                self.current_provider_name = saved_provider
+
+            providers_data = data.get("providers", {})
+            for p_name, p_conf in providers_data.items():
+                if p_name in self.default_providers:
+                    if "base_url" in p_conf and p_conf["base_url"]:
+                        self.default_providers[p_name].base_url = p_conf["base_url"]
+                    if "model_name" in p_conf and p_conf["model_name"]:
+                        self.default_providers[p_name].model_name = p_conf["model_name"]
+
+            if "cache_expiry_hours" in data:
+                self.cache_expiry_hours = data["cache_expiry_hours"]
+
+            self.logger.info("已成功装载本地持久化配置 settings.json，当前服务商: %s", self.current_provider_name)
+        except Exception as e:
+            self.logger.warning("读取本地 settings.json 失败: %s", str(e))
+
+    def save_settings(self) -> bool:
+        """将当前用户配置与活跃模型选择持久化写入 settings.json"""
+        import json
+        try:
+            providers_dump = {}
+            for p_name, p_conf in self.default_providers.items():
+                providers_dump[p_name] = {
+                    "base_url": p_conf.base_url,
+                    "model_name": p_conf.model_name,
+                }
+            data = {
+                "current_provider_name": self.current_provider_name,
+                "cache_expiry_hours": self.cache_expiry_hours,
+                "providers": providers_dump,
+            }
+            with open(self.config_json_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            self.logger.info("用户配置已成功持久化至: %s (当前服务商: %s)", self.config_json_path, self.current_provider_name)
+            return True
+        except Exception as e:
+            self.logger.error("保存本地 settings.json 失败: %s", str(e))
+            return False
 
 # 全局配置单例导出
 config = AppConfig()

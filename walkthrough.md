@@ -179,4 +179,22 @@ graph TD
   - **验证与基准测试**：
     - 编写自动化测试 [`tests/test_fast_quote_refresh.py`](file:///d:/AI/stockAnalasis/tests/test_fast_quote_refresh.py)，验证定向查询结构、空持仓保护、持仓价格更新以及本地首屏读取性能（实测耗时 1.41 ms，远低于 50 ms 阈值）；
     - 实机主界面切换测试：从侧边栏点击【虚拟操盘】首屏渲染耗时仅 **13.66 ms**，后台定向拉取平滑静默交付，视觉呈现深色金融高对比度统一标准。
+- **2026-09-20 [大语言模型设置持久化存储与活跃服务商跨会话自动恢复]**：
+  - **问题根因定位**：
+    1. 内存与磁盘割裂：旧版 `AppConfig` 仅在内存中维护 `current_provider_name` 与各服务商的 `base_url`、`model_name`，未实现 `settings.json` 的读写持久化。
+    2. 保存逻辑不完整：在 [`app/ui/pages/settings.py`](file:///d:/AI/stockAnalasis/app/ui/pages/settings.py) 中点击【安全保存模型配置】时，虽然使用 AES 加密将 Key 保存到了 `api_keys.enc`，但未将用户当前选中的活跃服务商及自定义端点参数写入 `settings.json`；
+    3. 界面初始化无回显：设置页面启动时下拉框默认硬编码加载首项（DeepSeek），重新启动软件后用户先前配置的其他模型（如通义千问、Kimi、GLM、Ollama 等）不会被自动选中。
+  - **修复实施方案**：
+    1. **配置层实现完整持久化通道 ([app/core/config.py](file:///d:/AI/stockAnalasis/app/core/config.py))**：
+       - 实现 `save_settings()`：将 `current_provider_name`、`cache_expiry_hours` 以及各厂商自定义的 `base_url`、`model_name` 全量格式化写入标准路径下的 `settings.json`；
+       - 实现 `load_settings()`：在应用启动及 `AppConfig` 实例化时自动反序列化 `settings.json`，无缝恢复用户上次保存的活跃服务商与所有模型参数。
+    2. **表现层双向闭环交互 ([app/ui/pages/settings.py](file:///d:/AI/stockAnalasis/app/ui/pages/settings.py))**：
+       - 在页面初始化时调用 `combo_provider.findText(config.current_provider_name)`，自动高亮并定位用户上次保存的服务商；
+       - 在 `_on_save_llm_clicked()` 中，同步更新 `config.current_provider_name` 并执行 `config.save_settings()` 写入磁盘；
+       - 新增 `provider_configured = Signal(str)` 信号，在服务商切换或保存时触发。
+    3. **主窗口状态栏联动 ([app/ui/main_window.py](file:///d:/AI/stockAnalasis/app/ui/main_window.py))**：
+       - 主窗口监听 `provider_configured` 信号，实时联动更新底部状态栏展示的模型名称（如 `当前模型后端: Kimi (Moonshot)`）。
+  - **验证与效果**：
+    - 运行配置持久化测试：将活跃服务商修改为 `Kimi (Moonshot)` 并配置模型为 `moonshot-v1-32k`，重载验证 100% 通过；
+    - 实机 UI 启动截图验证：主界面启动即自动高亮 `Kimi (Moonshot)`，对应 Base URL、Model ID 及 API Key 全部精准回填，底部状态栏实时同步。
 
