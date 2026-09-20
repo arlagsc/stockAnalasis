@@ -28,6 +28,7 @@ from app.services.trading_service import trading_service
 from app.services.auto_trader import auto_trader
 from app.ai.skill_engine import skill_engine
 from app.data.fetcher import data_fetcher
+from app.services.watchlist_service import watchlist_service
 
 class AutoTradeWorker(QThread):
     """AI 自动计算建仓后台异步工作线程"""
@@ -144,7 +145,7 @@ class BuyDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.setSpacing(12)
 
-        # 账户选择
+        # 1. 账户选择
         layout.addWidget(QLabel("选择操作账户:"))
         self.combo_account = QComboBox()
         self.combo_account.addItem("人类主观操盘账户 (MANUAL)", "MANUAL")
@@ -153,14 +154,24 @@ class BuyDialog(QDialog):
             self.combo_account.setCurrentIndex(1)
         layout.addWidget(self.combo_account)
 
-        # 股票代码（防御布尔值传入）
-        layout.addWidget(QLabel("股票代码 (6位代码):"))
+        # 2. 自选股快捷选择
+        layout.addWidget(QLabel("从自选股快速选择 (可直接点选):"))
+        self.combo_watchlist = QComboBox()
+        layout.addWidget(self.combo_watchlist)
+
+        # 3. 股票代码（防御布尔值传入）
+        layout.addWidget(QLabel("股票代码 (6位代码，支持自选自动填入或手动输入):"))
         sym_str = default_symbol if isinstance(default_symbol, str) else ""
         self.input_symbol = QLineEdit(sym_str)
         self.input_symbol.setPlaceholderText("例如 002429 或 600519")
+        self.input_symbol.textChanged.connect(self._on_symbol_text_changed)
         layout.addWidget(self.input_symbol)
 
-        # 买入股数 (必须是 100 股整数倍)
+        # 初始化自选列表并绑定切换事件
+        self._load_watchlist_options(sym_str)
+        self.combo_watchlist.currentIndexChanged.connect(self._on_watchlist_selected)
+
+        # 4. 买入股数 (必须是 100 股整数倍)
         layout.addWidget(QLabel("买入数量 (股，100 股为 1 手):"))
         self.spin_amount = QSpinBox()
         self.spin_amount.setRange(100, 1000000)
@@ -168,7 +179,7 @@ class BuyDialog(QDialog):
         self.spin_amount.setValue(1000)
         layout.addWidget(self.spin_amount)
 
-        # 建仓理由
+        # 5. 建仓理由
         layout.addWidget(QLabel("建仓理由或战术策略:"))
         self.input_reason = QLineEdit()
         self.input_reason.setPlaceholderText("例如: 缩量回踩20日线企稳, 突破平台颈线")
@@ -184,12 +195,54 @@ class BuyDialog(QDialog):
         btn_box.addWidget(self.btn_submit)
         layout.addLayout(btn_box)
 
+    def _load_watchlist_options(self, default_symbol: str = ""):
+        """加载自选池标的至下拉列表"""
+        self.combo_watchlist.blockSignals(True)
+        self.combo_watchlist.clear()
+
+        items = watchlist_service.get_watchlist_simple()
+        if not items:
+            self.combo_watchlist.addItem("⭐ 自选池暂无标的 (请手动输入代码)", "")
+            self.combo_watchlist.setEnabled(False)
+        else:
+            self.combo_watchlist.setEnabled(True)
+            self.combo_watchlist.addItem("⭐ 选择自选股快速填入...", "")
+            selected_idx = 0
+            for idx, item in enumerate(items, start=1):
+                sym = item["symbol"]
+                name = item["name"]
+                self.combo_watchlist.addItem(f"{sym} {name}", sym)
+                if default_symbol and sym == default_symbol:
+                    selected_idx = idx
+            self.combo_watchlist.setCurrentIndex(selected_idx)
+
+        self.combo_watchlist.blockSignals(False)
+
+    def _on_watchlist_selected(self, index: int):
+        """选中自选股后自动回填代码输入框"""
+        sym = self.combo_watchlist.currentData()
+        if sym:
+            self.input_symbol.blockSignals(True)
+            self.input_symbol.setText(sym)
+            self.input_symbol.blockSignals(False)
+
+    def _on_symbol_text_changed(self, text: str):
+        """输入框输入时双向高亮对应自选股"""
+        clean_text = text.strip()
+        self.combo_watchlist.blockSignals(True)
+        idx = self.combo_watchlist.findData(clean_text)
+        if idx >= 0:
+            self.combo_watchlist.setCurrentIndex(idx)
+        else:
+            self.combo_watchlist.setCurrentIndex(0)
+        self.combo_watchlist.blockSignals(False)
+
     def _on_submit(self):
         sym = self.input_symbol.text().strip().zfill(6)
         amt = self.spin_amount.value()
         acc = self.combo_account.currentData()
         reason = self.input_reason.text().strip() or "盘中波段建仓"
-        
+
         success, msg = trading_service.buy_stock(account_type=acc, symbol=sym, amount=amt, reason=reason)
         if success:
             QMessageBox.information(self, "交易成功", msg)
