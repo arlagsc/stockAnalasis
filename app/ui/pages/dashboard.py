@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QHeaderView, QFrame
 )
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QColor
 import pandas as pd
 
 from app.ui.components.stat_card import StatCard
@@ -123,29 +124,43 @@ class DashboardPage(QWidget):
 
             item_sym = QTableWidgetItem(sym)
             item_sym.setTextAlignment(Qt.AlignCenter)
+            item_sym.setForeground(QColor("#F1F5F9"))
+
             item_name = QTableWidgetItem(name)
             item_name.setTextAlignment(Qt.AlignCenter)
+            item_name.setForeground(QColor("#FFFFFF"))
+
             item_price = QTableWidgetItem(f"{price:.2f}")
             item_price.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
             
-            # 涨跌幅根据正负着色
+            # 涨跌幅根据正负着色 (高对比度亮红亮绿与平盘亮灰)
             item_chg = QTableWidgetItem(f"{change:+.2f}%")
             item_chg.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
             if change > 0:
-                item_chg.setForeground(Qt.red)
-                item_price.setForeground(Qt.red)
+                item_chg.setForeground(QColor("#F87171"))
+                item_price.setForeground(QColor("#F87171"))
             elif change < 0:
-                item_chg.setForeground(Qt.green)
-                item_price.setForeground(Qt.green)
+                item_chg.setForeground(QColor("#34D399"))
+                item_price.setForeground(QColor("#34D399"))
+            else:
+                item_chg.setForeground(QColor("#CBD5E1"))
+                item_price.setForeground(QColor("#CBD5E1"))
 
             item_vol = QTableWidgetItem(f"{vol:,.0f}")
             item_vol.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            item_vol.setForeground(QColor("#E2E8F0"))
+
             item_turnover = QTableWidgetItem(f"{turnover:.2f}%")
             item_turnover.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            item_turnover.setForeground(QColor("#E2E8F0"))
+
             item_pe = QTableWidgetItem(f"{pe:.1f}" if pe > 0 else "--")
             item_pe.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            item_pe.setForeground(QColor("#94A3B8") if pe <= 0 else QColor("#E2E8F0"))
+
             item_val = QTableWidgetItem(f"{mkt_val:.1f}")
             item_val.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            item_val.setForeground(QColor("#E2E8F0"))
 
             self.table.setItem(row_idx, 0, item_sym)
             self.table.setItem(row_idx, 1, item_name)

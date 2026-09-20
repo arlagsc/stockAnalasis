@@ -143,5 +143,23 @@ graph TD
     3. 任务完成后呼出卡片式 `AutoTradeResultDialog` 执行报告弹窗，详细展示成交价、股数、成交额以及 AI 决策归因与契合军规，并触发资产走势与持仓全量刷新。
   - **集成验证与实机渲染**：
     1. 编写自动化集成测试脚本 [`tests/test_auto_trader.py`](file:///d:/AI/stockAnalasis/tests/test_auto_trader.py)，覆盖低现金拦截、正常多因子自动建仓、100 股取整测算、T+1 冻结与流水核实、避开已有持仓去重建仓以及 5 支持仓上限风控拦截，所有 5 项测试全部 PASS。
-    2. 完成实机渲染截图校验，新按钮布局和谐，AI 账户自动买入后总资产与 5 支持仓市值同步精准更新。
+- **2026-09-20 [全系统深色金融终端高对比度与表格交替行白底白字根除]**：
+  - **问题根因定位**：
+    1. 在 Windows 操作系统默认亮色调色板环境下，当 `QTableWidget` 或 `QTableView` 开启 `setAlternatingRowColors(True)` 时，若 QSS 中未显式指定 `alternate-background-color`，Qt 引擎会自动继承 Windows 系统的亮白底色 (`#FFFFFF`) 填充偶数行。
+    2. 深色金融主题下的单元格文本颜色为浅白/浅灰色（`#E2E8F0`、`#F1F5F9` 等），导致偶数行产生极严重的“白底白字”对比度缺失，股票代码、名称、指标数值完全无法辨识。
+  - **三层立体防护修复方案**：
+    1. **系统底层调色板锁定 ([main.py](file:///d:/AI/stockAnalasis/main.py))**：显式应用 `app.setStyle("Fusion")` 跨平台渲染引擎，并构建全量深色 `QPalette` 注入 `QApplication`。将 `QPalette.AlternateBase` 强制锁定为深色 `#181C26`，`QPalette.Base` 锁定为 `#12141B`，从系统底层彻底杜绝操作系统亮白画刷泄漏。
+    2. **全局样式表深度重构 ([app/ui/theme.py](file:///d:/AI/stockAnalasis/app/ui/theme.py))**：
+       - 为 `QTableWidget, QTableView` 显式设置 `background-color: #0F1218` 与 `alternate-background-color: #171B24`；
+       - 显式声明 `QTableWidget::item` 文本色为高对比度 `#F1F5F9`，`QTableWidget::item:alternate` 背景为 `#171B24`，选中态背景为 `#1E3A8A`，选中文字纯白；
+       - 统一优化表头 `QHeaderView::section` 背景为 `#161922`，文字为 `#CBD5E1`。
+    3. **业务页面单元格渲染前景色显式加固**：
+       - [`app/ui/pages/dashboard.py`](file:///d:/AI/stockAnalasis/app/ui/pages/dashboard.py)：常规列单元格显式绑定 `QColor("#F1F5F9")`，涨跌幅采用深色底优化的高饱和亮红 (`#F87171`)、亮绿 (`#34D399`) 与平盘亮灰 (`#CBD5E1`)。
+       - [`app/ui/pages/watchlist.py`](file:///d:/AI/stockAnalasis/app/ui/pages/watchlist.py)：自选股代码、名称、最新价、成交量等全量单元格显式配置高对比度前景色。
+       - [`app/ui/pages/screener.py`](file:///d:/AI/stockAnalasis/app/ui/pages/screener.py)：多因子与自然语言筛选结果表格单元格显式前景色加固。
+       - [`app/ui/pages/virtual_trading.py`](file:///d:/AI/stockAnalasis/app/ui/pages/virtual_trading.py)：持仓明细、成交流水、操盘军规知识库表格全量单元格显式高对比度前景色加固。
+       - [`app/ui/components/stat_card.py`](file:///d:/AI/stockAnalasis/app/ui/components/stat_card.py)：提升指标卡片标题（`#CBD5E1`）与副标题（`#94A3B8`）对比度，保证弱光与强光环境下数据清晰醒目。
+  - **实机截图与验证**：
+    - 大盘看板偶数行白底彻底清除，所有行列信息清晰锐利；
+    - 自选股、智能筛选、虚拟操盘持仓与流水表格在深色主题下均呈现统一、高对比度的专业金融终端视觉效果。
 

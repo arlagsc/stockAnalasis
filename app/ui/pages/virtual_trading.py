@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QComboBox, QSpinBox, QDoubleSpinBox, QMessageBox, QFrame, QScrollArea
 )
 from PySide6.QtCore import Qt, Signal, QThread
+from PySide6.QtGui import QColor
 import pyqtgraph as pg
 
 from app.core.config import logger
@@ -459,22 +460,45 @@ class VirtualTradingPage(QWidget):
             pnl = p["floating_pnl"]
             pnl_pct = p["floating_pnl_pct"]
 
-            self.table_pos.setItem(row_idx, 0, QTableWidgetItem(sym))
-            self.table_pos.setItem(row_idx, 1, QTableWidgetItem(name))
-            self.table_pos.setItem(row_idx, 2, QTableWidgetItem(f"{tot:,}"))
+            item_sym = QTableWidgetItem(sym)
+            item_sym.setForeground(QColor("#F1F5F9"))
+            self.table_pos.setItem(row_idx, 0, item_sym)
+
+            item_name = QTableWidgetItem(name)
+            item_name.setForeground(QColor("#FFFFFF"))
+            self.table_pos.setItem(row_idx, 1, item_name)
+
+            item_tot = QTableWidgetItem(f"{tot:,}")
+            item_tot.setForeground(QColor("#E2E8F0"))
+            self.table_pos.setItem(row_idx, 2, item_tot)
             
-            # T+1 可卖展示 (若有锁定股数则特别提醒)
+            # T+1 可卖展示 (若有锁定股数则明黄提醒，否则纯白)
             item_avail = QTableWidgetItem(f"{avail:,}")
             if avail < tot:
-                item_avail.setForeground(Qt.yellow)
+                item_avail.setForeground(QColor("#FCD34D"))
+            else:
+                item_avail.setForeground(QColor("#E2E8F0"))
             self.table_pos.setItem(row_idx, 3, item_avail)
 
-            self.table_pos.setItem(row_idx, 4, QTableWidgetItem(f"{cost:.2f}"))
-            self.table_pos.setItem(row_idx, 5, QTableWidgetItem(f"{cur:.2f}"))
-            self.table_pos.setItem(row_idx, 6, QTableWidgetItem(f"{mkt:,.2f}"))
+            item_cost = QTableWidgetItem(f"{cost:.2f}")
+            item_cost.setForeground(QColor("#E2E8F0"))
+            self.table_pos.setItem(row_idx, 4, item_cost)
+
+            item_cur = QTableWidgetItem(f"{cur:.2f}")
+            item_cur.setForeground(QColor("#E2E8F0"))
+            self.table_pos.setItem(row_idx, 5, item_cur)
+
+            item_mkt = QTableWidgetItem(f"{mkt:,.2f}")
+            item_mkt.setForeground(QColor("#E2E8F0"))
+            self.table_pos.setItem(row_idx, 6, item_mkt)
 
             item_pnl = QTableWidgetItem(f"{pnl:+,.2f} ({pnl_pct:+.2f}%)")
-            item_pnl.setForeground(Qt.red if pnl > 0 else (Qt.green if pnl < 0 else Qt.white))
+            if pnl > 0:
+                item_pnl.setForeground(QColor("#F87171"))
+            elif pnl < 0:
+                item_pnl.setForeground(QColor("#34D399"))
+            else:
+                item_pnl.setForeground(QColor("#CBD5E1"))
             self.table_pos.setItem(row_idx, 7, item_pnl)
 
             # 操作按钮组：平仓 / 研判
@@ -536,24 +560,45 @@ class VirtualTradingPage(QWidget):
         trades = trading_service.get_trades_history(limit=50)
         self.table_trades.setRowCount(len(trades))
         for row_idx, t in enumerate(trades):
-            self.table_trades.setItem(row_idx, 0, QTableWidgetItem(t["trade_time"]))
-            self.table_trades.setItem(row_idx, 1, QTableWidgetItem(t["account_type"]))
-            self.table_trades.setItem(row_idx, 2, QTableWidgetItem(t["symbol"]))
-            self.table_trades.setItem(row_idx, 3, QTableWidgetItem(t["name"]))
+            item_time = QTableWidgetItem(t["trade_time"])
+            item_time.setForeground(QColor("#94A3B8"))
+            self.table_trades.setItem(row_idx, 0, item_time)
+
+            item_acc = QTableWidgetItem(t["account_type"])
+            item_acc.setForeground(QColor("#38BDF8") if t["account_type"] == "MANUAL" else QColor("#C084FC"))
+            self.table_trades.setItem(row_idx, 1, item_acc)
+
+            item_sym = QTableWidgetItem(t["symbol"])
+            item_sym.setForeground(QColor("#F1F5F9"))
+            self.table_trades.setItem(row_idx, 2, item_sym)
+
+            item_name = QTableWidgetItem(t["name"])
+            item_name.setForeground(QColor("#FFFFFF"))
+            self.table_trades.setItem(row_idx, 3, item_name)
             
             act_item = QTableWidgetItem(t["action"])
-            act_item.setForeground(Qt.red if t["action"] == "BUY" else Qt.green)
+            act_item.setForeground(QColor("#F87171") if t["action"] == "BUY" else QColor("#34D399"))
             self.table_trades.setItem(row_idx, 4, act_item)
 
-            self.table_trades.setItem(row_idx, 5, QTableWidgetItem(f"{t['price']:.2f}"))
-            self.table_trades.setItem(row_idx, 6, QTableWidgetItem(f"{t['amount']:,}"))
+            item_price = QTableWidgetItem(f"{t['price']:.2f}")
+            item_price.setForeground(QColor("#E2E8F0"))
+            self.table_trades.setItem(row_idx, 5, item_price)
+
+            item_amt = QTableWidgetItem(f"{t['amount']:,}")
+            item_amt.setForeground(QColor("#E2E8F0"))
+            self.table_trades.setItem(row_idx, 6, item_amt)
+
             fee = t["tax_fee"] + t["commission_fee"]
-            self.table_trades.setItem(row_idx, 7, QTableWidgetItem(f"{fee:.2f}"))
+            item_fee = QTableWidgetItem(f"{fee:.2f}")
+            item_fee.setForeground(QColor("#94A3B8"))
+            self.table_trades.setItem(row_idx, 7, item_fee)
             
             desc_text = t["reason"]
             if t["action"] == "SELL":
                 desc_text = f"{t['realized_pnl']:+.2f}元 ({t['realized_pct']:+.2f}%) | {t['reason']}"
-            self.table_trades.setItem(row_idx, 8, QTableWidgetItem(desc_text))
+            item_desc = QTableWidgetItem(desc_text)
+            item_desc.setForeground(QColor("#FCD34D") if t["action"] == "SELL" else QColor("#CBD5E1"))
+            self.table_trades.setItem(row_idx, 8, item_desc)
 
     def _render_pk_chart(self):
         """绘制人手 vs AI 双轨净值收益率走势图"""
@@ -582,11 +627,25 @@ class VirtualTradingPage(QWidget):
         skills = skill_engine.list_all_skills()
         self.table_skills.setRowCount(len(skills))
         for row_idx, s in enumerate(skills):
-            self.table_skills.setItem(row_idx, 0, QTableWidgetItem(s["category"]))
-            self.table_skills.setItem(row_idx, 1, QTableWidgetItem(s["rule_title"]))
-            self.table_skills.setItem(row_idx, 2, QTableWidgetItem(s["rule_markdown"]))
-            self.table_skills.setItem(row_idx, 3, QTableWidgetItem(f"{s['win_rate_score']:.1f}"))
-            self.table_skills.setItem(row_idx, 4, QTableWidgetItem(s["from_symbol"] or "--"))
+            item_cat = QTableWidgetItem(s["category"])
+            item_cat.setForeground(QColor("#38BDF8"))
+            self.table_skills.setItem(row_idx, 0, item_cat)
+
+            item_title = QTableWidgetItem(s["rule_title"])
+            item_title.setForeground(QColor("#FFFFFF"))
+            self.table_skills.setItem(row_idx, 1, item_title)
+
+            item_content = QTableWidgetItem(s["rule_markdown"])
+            item_content.setForeground(QColor("#E2E8F0"))
+            self.table_skills.setItem(row_idx, 2, item_content)
+
+            item_score = QTableWidgetItem(f"{s['win_rate_score']:.1f}")
+            item_score.setForeground(QColor("#10B981"))
+            self.table_skills.setItem(row_idx, 3, item_score)
+
+            item_from = QTableWidgetItem(s["from_symbol"] or "--")
+            item_from.setForeground(QColor("#94A3B8"))
+            self.table_skills.setItem(row_idx, 4, item_from)
             
             btn_toggle = QPushButton("已激活" if s["is_active"] else "已停用")
             btn_toggle.setStyleSheet("background-color: #10B981; color: #FFFFFF; font-weight: bold; border-radius: 3px; padding: 2px 6px;" if s["is_active"] else "background-color: #64748B; color: #FFFFFF; border-radius: 3px; padding: 2px 6px;")

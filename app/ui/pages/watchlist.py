@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QHeaderView, QComboBox, QMessageBox
 )
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QColor
 
 from app.services.watchlist_service import watchlist_service
 
@@ -90,24 +91,34 @@ class WatchlistPage(QWidget):
 
             item_sym = QTableWidgetItem(sym)
             item_sym.setTextAlignment(Qt.AlignCenter)
+            item_sym.setForeground(QColor("#F1F5F9"))
+
             item_name = QTableWidgetItem(name)
             item_name.setTextAlignment(Qt.AlignCenter)
+            item_name.setForeground(QColor("#FFFFFF"))
+
             item_price = QTableWidgetItem(f"{price:.2f}")
             item_price.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
             
             item_chg = QTableWidgetItem(f"{change:+.2f}%")
             item_chg.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
             if change > 0:
-                item_chg.setForeground(Qt.red)
-                item_price.setForeground(Qt.red)
+                item_chg.setForeground(QColor("#F87171"))
+                item_price.setForeground(QColor("#F87171"))
             elif change < 0:
-                item_chg.setForeground(Qt.green)
-                item_price.setForeground(Qt.green)
+                item_chg.setForeground(QColor("#34D399"))
+                item_price.setForeground(QColor("#34D399"))
+            else:
+                item_chg.setForeground(QColor("#CBD5E1"))
+                item_price.setForeground(QColor("#CBD5E1"))
 
             item_to = QTableWidgetItem(f"{turnover:.2f}%")
             item_to.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            item_to.setForeground(QColor("#E2E8F0"))
+
             item_grp = QTableWidgetItem(grp)
             item_grp.setTextAlignment(Qt.AlignCenter)
+            item_grp.setForeground(QColor("#CBD5E1"))
 
             # 操作按钮组：研判直达 + 移出自选
             action_widget = QWidget()

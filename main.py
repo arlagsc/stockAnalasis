@@ -28,6 +28,25 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
     
+    # 强制启用跨平台一致的 Fusion 风格并注入深色调色板，防止系统默认亮色底泄漏
+    from PySide6.QtGui import QPalette, QColor
+    app.setStyle("Fusion")
+    dark_palette = QPalette()
+    dark_palette.setColor(QPalette.Window, QColor("#0F1115"))
+    dark_palette.setColor(QPalette.WindowText, QColor("#F8FAFC"))
+    dark_palette.setColor(QPalette.Base, QColor("#12141B"))
+    dark_palette.setColor(QPalette.AlternateBase, QColor("#181C26"))  # 核心：锁定深色交替行背景
+    dark_palette.setColor(QPalette.ToolTipBase, QColor("#1E293B"))
+    dark_palette.setColor(QPalette.ToolTipText, QColor("#FFFFFF"))
+    dark_palette.setColor(QPalette.Text, QColor("#F1F5F9"))
+    dark_palette.setColor(QPalette.Button, QColor("#1E293B"))
+    dark_palette.setColor(QPalette.ButtonText, QColor("#FFFFFF"))
+    dark_palette.setColor(QPalette.BrightText, QColor("#EF4444"))
+    dark_palette.setColor(QPalette.Link, QColor("#38BDF8"))
+    dark_palette.setColor(QPalette.Highlight, QColor("#1D4ED8"))
+    dark_palette.setColor(QPalette.HighlightedText, QColor("#FFFFFF"))
+    app.setPalette(dark_palette)
+
     # 加载全局深色金融主题 QSS
     app.setStyleSheet(DARK_THEME_QSS)
 

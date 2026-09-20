@@ -129,47 +129,71 @@ QPushButton#SecondaryButton:hover {
 
 /* 文本输入框与下拉选择框 */
 QLineEdit, QTextEdit, QPlainTextEdit, QComboBox {
-    background-color: #181B22;
-    border: 1px solid #2C323D;
+    background-color: #161922;
+    border: 1px solid #2C3340;
     border-radius: 6px;
     padding: 6px 12px;
-    color: #F1F5F9;
+    color: #FFFFFF;
 }
 QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus, QComboBox:focus {
     border: 1px solid #38BDF8;
-    background-color: #1C2028;
+    background-color: #1C212D;
+    color: #FFFFFF;
 }
 QComboBox::drop-down {
     border: none;
     padding-right: 8px;
 }
 QComboBox QAbstractItemView {
-    background-color: #1E222B;
+    background-color: #161922;
     border: 1px solid #334155;
     selection-background-color: #2563EB;
-    color: #F1F5F9;
+    color: #FFFFFF;
 }
 
-/* 数据表格 (QTableWidget / QTableView) */
+/* 数据表格 (QTableWidget / QTableView) 终极深色高对比度防御 */
 QTableWidget, QTableView {
-    background-color: #16181F;
+    background-color: #0F1218;
+    alternate-background-color: #171B24; /* 显式交替行：极深微灰蓝，彻底根除白色交替底！ */
     border: 1px solid #232732;
     border-radius: 6px;
-    gridline-color: #20242D;
-    color: #E2E8F0;
-    selection-background-color: #1E293B;
-    selection-color: #38BDF8;
+    gridline-color: #1E232F;
+    color: #F8FAFC;
+    selection-background-color: #1D4ED8;
+    selection-color: #FFFFFF;
+    outline: none;
+}
+QTableWidget::item, QTableView::item {
+    background-color: transparent;
+    color: #F1F5F9;
+    padding: 6px 8px;
+    border: none;
+}
+QTableWidget::item:alternate, QTableView::item:alternate {
+    background-color: #171B24;
+    color: #F1F5F9;
+}
+QTableWidget::item:selected, QTableView::item:selected {
+    background-color: #1E3A8A;
+    color: #FFFFFF;
+}
+QTableWidget::item:hover, QTableView::item:hover {
+    background-color: #222836;
+    color: #FFFFFF;
 }
 QHeaderView::section {
-    background-color: #1C1F27;
-    color: #94A3B8;
+    background-color: #161922;
+    color: #CBD5E1;
     padding: 8px 6px;
     border: none;
-    border-bottom: 1px solid #282D38;
+    border-bottom: 1px solid #2B3240;
     font-weight: 600;
 }
+QHeaderView::section:checked {
+    color: #38BDF8;
+}
 QTableCornerButton::section {
-    background-color: #1C1F27;
+    background-color: #161922;
     border: none;
 }
 

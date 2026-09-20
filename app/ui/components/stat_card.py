@@ -23,18 +23,18 @@ class StatCard(QFrame):
 
         # 标题
         self.lbl_title = QLabel(title)
-        self.lbl_title.setStyleSheet("color: #94A3B8; font-size: 12px; font-weight: 500;")
+        self.lbl_title.setStyleSheet("color: #CBD5E1; font-size: 13px; font-weight: 600;")
         layout.addWidget(self.lbl_title)
 
         # 主数值
         self.lbl_value = QLabel(value)
-        self.lbl_value.setStyleSheet("font-size: 20px; font-weight: bold;")
+        self.lbl_value.setStyleSheet("font-size: 22px; font-weight: 800;")
         self.set_status(status)
         layout.addWidget(self.lbl_value)
 
         # 副标题说明
         self.lbl_subtitle = QLabel(subtitle)
-        self.lbl_subtitle.setStyleSheet("color: #64748B; font-size: 11px;")
+        self.lbl_subtitle.setStyleSheet("color: #94A3B8; font-size: 12px;")
         layout.addWidget(self.lbl_subtitle)
 
     def set_data(self, value: str, subtitle: str = "", status: str = "flat"):
@@ -45,12 +45,12 @@ class StatCard(QFrame):
         self.set_status(status)
 
     def set_status(self, status: str):
-        """设置涨跌颜色状态: up (红), down (绿), flat (白), accent (蓝)"""
+        """设置涨跌颜色状态: up (亮红), down (亮绿), flat (白), accent (天蓝)"""
         if status == "up":
-            self.lbl_value.setStyleSheet("color: #EF4444; font-size: 20px; font-weight: bold;")
+            self.lbl_value.setStyleSheet("color: #F87171; font-size: 22px; font-weight: 800;")
         elif status == "down":
-            self.lbl_value.setStyleSheet("color: #10B981; font-size: 20px; font-weight: bold;")
+            self.lbl_value.setStyleSheet("color: #34D399; font-size: 22px; font-weight: 800;")
         elif status == "accent":
-            self.lbl_value.setStyleSheet("color: #38BDF8; font-size: 20px; font-weight: bold;")
+            self.lbl_value.setStyleSheet("color: #38BDF8; font-size: 22px; font-weight: 800;")
         else:
-            self.lbl_value.setStyleSheet("color: #F8FAFC; font-size: 20px; font-weight: bold;")
+            self.lbl_value.setStyleSheet("color: #FFFFFF; font-size: 22px; font-weight: 800;")
