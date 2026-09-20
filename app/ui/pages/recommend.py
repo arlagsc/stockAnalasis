@@ -151,6 +151,10 @@ class RecommendPage(QWidget):
                 card = RecommendCard(stock)
                 card.stock_selected.connect(self.stock_selected.emit)
                 self.cards_layout.insertWidget(self.cards_layout.count() - 1, card)
+        except Exception as e:
+            from app.core.config import logger
+            logger.error("生成推荐列表异常: %s", e, exc_info=True)
+            self.lbl_market_summary.setText(f"推荐生成异常: {str(e)}")
         finally:
             self.btn_refresh.setEnabled(True)
             self.btn_refresh.setText("生成最新推荐")

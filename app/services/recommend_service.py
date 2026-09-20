@@ -52,7 +52,7 @@ class RecommendService:
         # 动态检索并注入已沉淀的操盘技能知识库
         from app.ai.skill_engine import skill_engine
         skills_block = skill_engine.get_active_skills_prompt_block()
-        formatted_system_prompt = RECOMMEND_SYSTEM_PROMPT.format(learned_skills_block=skills_block)
+        formatted_system_prompt = RECOMMEND_SYSTEM_PROMPT.replace("{learned_skills_block}", skills_block)
 
         # 调用大模型生成结构化 JSON
         raw_response = llm_client.chat_complete(

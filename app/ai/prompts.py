@@ -82,10 +82,10 @@ RECOMMEND_SYSTEM_PROMPT = """你是一个股票严选策略官。基于系统初
 
 输出必须为严格的 JSON 格式：
 ```json
-{
+{{
   "market_summary": "当前市场整体风偏与热度简述（50字内）",
   "recommended_stocks": [
-    {
+    {{
       "symbol": "600519",
       "name": "贵州茅台",
       "score": 92,
@@ -95,9 +95,9 @@ RECOMMEND_SYSTEM_PROMPT = """你是一个股票严选策略官。基于系统初
         "估值回落至近三年中位数下方，具备防御价值"
       ],
       "risk_warnings": "高端白酒商务需求阶段性承压"
-    }
+    }}
   ]
-}
+}}
 ```
 """
 

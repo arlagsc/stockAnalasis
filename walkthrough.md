@@ -264,6 +264,24 @@ graph TD
          - `Fixed`：深色模式高对比度校准、表格操作按钮挤压修复、模型选择持久化修复。
     3. **Git 版本标签归档与远程发布**：
        - 创建正式带注释标签 `v1.0.0`，并同步推送至 GitHub 远程仓库。
+- **2026-09-20 [修复精选推荐 Prompt 占位符解析引发的 KeyError 缺陷]**：
+  - **缺陷背景与堆栈分析**：
+    - 用户点击【AI 智能精选推荐看板】中的“生成最新推荐”按钮时报错崩溃：
+      ```text
+      KeyError: '\n  "market_summary"'
+      ```
+    - 根本原因：`app/ai/prompts.py` 中的 `RECOMMEND_SYSTEM_PROMPT` 内置了结构化 JSON 输出示例，其中未经转义的单花括号 `{...}` 被 Python 的 `str.format()` 机制错误识别为格式化参数占位符，从而引发 `KeyError`。
+  - **修复措施与架构强化**：
+    1. **Prompt 模板规范转义 ([app/ai/prompts.py](file:///d:/AI/stockAnalasis/app/ai/prompts.py))**：
+       - 将 `RECOMMEND_SYSTEM_PROMPT` 内 JSON 示例模板的所有花括号严格转义为 `{{` 与 `}}`，杜绝任何调用 `.format()` 时的语义歧义。
+    2. **安全替换机制 ([app/services/recommend_service.py](file:///d:/AI/stockAnalasis/app/services/recommend_service.py))**：
+       - 将 `RECOMMEND_SYSTEM_PROMPT.format(learned_skills_block=skills_block)` 改用安全的字符串定向替换 `replace("{learned_skills_block}", skills_block)`。
+    3. **页面异常防御性捕获 ([app/ui/pages/recommend.py](file:///d:/AI/stockAnalasis/app/ui/pages/recommend.py))**：
+       - 在 `refresh_recommendations()` 增加 `except Exception as e` 捕获块，记录结构化错误日志并在界面优雅展示状态提示，避免静默挂起。
+  - **实机运行与截图核验**：
+    - 实机触发“生成最新推荐”，服务正常完成复合量化打分与大模型语义归因，界面成功渲染推荐卡片列表（包含综合评分、核心推荐理由、风险提示与深度研判入口）；
+    - 全量自动化测试保持 100% 通过。
+
 
 
 
