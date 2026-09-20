@@ -197,4 +197,20 @@ graph TD
   - **验证与效果**：
     - 运行配置持久化测试：将活跃服务商修改为 `Kimi (Moonshot)` 并配置模型为 `moonshot-v1-32k`，重载验证 100% 通过；
     - 实机 UI 启动截图验证：主界面启动即自动高亮 `Kimi (Moonshot)`，对应 Base URL、Model ID 及 API Key 全部精准回填，底部状态栏实时同步。
+- **2026-09-20 [个股研判操作栏集成自选股极速下拉切换与双向状态联动]**：
+  - **业务背景与交互需求**：
+    - 用户在【个股研判】页面深度分析某标的时，此前需手动输入 6 位代码或通过侧边栏返回自选股列表再行点击。为进一步提升投研工作流效率，需要在个股研判顶部操作栏直接提供【自选股下拉选择框】，支持用户一键展开并极速切换所关注的自选标的。
+  - **模块设计与实现方案**：
+    1. **极速自选查询接口 ([app/services/watchlist_service.py](file:///d:/AI/stockAnalasis/app/services/watchlist_service.py))**：
+       - 新增 `get_watchlist_simple()` 方法，通过一条轻量 SQL 联合查询 `Watchlist` 与 `StockBasic`，仅提取代码与股票简称，查询耗时趋近于 0 毫秒。
+    2. **操作栏新增下拉控件与事件响应 ([app/ui/pages/stock_detail.py](file:///d:/AI/stockAnalasis/app/ui/pages/stock_detail.py))**：
+       - 在顶部操作栏增加 `combo_watchlist (QComboBox)` 下拉控件；
+       - 实现 `refresh_watchlist_combo()` 方法：空自选时展示“⭐ 自选池为空”并禁用，有自选时格式化展示 `002429 兆驰股份` 等项，并在初始化与自选状态切换时自动刷新；
+       - 监听 `currentIndexChanged` 信号，用户选中项后自动提取股票代码并无缝触发 `load_stock()` 加载日 K 线与基本面；
+       - 双向高亮同步：在 `load_stock()` 中，若当前展示的标的属于自选池，自动高亮选中下拉框对应项；若非自选标的则重置为默认提示项。
+    3. **主窗口切换生命周期保障 ([app/ui/main_window.py](file:///d:/AI/stockAnalasis/app/ui/main_window.py))**：
+       - 在侧边栏导航切换至【个股研判】（index == 4）时，主动触发 `page_stock_detail.refresh_watchlist_combo()`，确保自选股列表在其他页面被增删改后，切至研判页面始终保持最新。
+  - **实机测试与验证**：
+    - 自动化测试用例验证下拉项装载与切换联动，选中项正确驱动页面加载对应标的；
+    - 实机 UI 截图验证：自选下拉框与现有搜索框、按钮排布协调，深色主题对比度锐利，切换后 K 线图与指标秒级刷新。
 

@@ -11,7 +11,7 @@ import pandas as pd
 from sqlalchemy import select, delete
 
 from app.core.config import logger
-from app.core.database import db_manager, Watchlist
+from app.core.database import db_manager, Watchlist, StockBasic
 from app.services.data_service import data_service
 
 class WatchlistService:
@@ -101,6 +101,29 @@ class WatchlistService:
         try:
             groups = session.query(Watchlist.group_name).distinct().all()
             return [g[0] for g in groups if g[0]] or ["默认自选"]
+        finally:
+            session.close()
+
+    def get_watchlist_simple(self) -> List[Dict[str, str]]:
+        """获取极简自选股列表用于下拉选择快速切换 (仅含代码与名称，毫秒级)"""
+        session = db_manager.get_session()
+        try:
+            results = (
+                session.query(Watchlist.symbol, StockBasic.name)
+                .outerjoin(StockBasic, Watchlist.symbol == StockBasic.symbol)
+                .order_by(Watchlist.id.asc())
+                .all()
+            )
+            items = []
+            for sym, name in results:
+                items.append({
+                    "symbol": sym,
+                    "name": name or f"标的{sym}",
+                })
+            return items
+        except Exception as e:
+            logger.error("查询极简自选股列表异常: %s", str(e))
+            return []
         finally:
             session.close()
 

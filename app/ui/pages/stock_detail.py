@@ -7,7 +7,7 @@
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
-    QTextEdit, QSplitter, QFrame, QMessageBox
+    QTextEdit, QSplitter, QFrame, QMessageBox, QComboBox
 )
 from PySide6.QtCore import Qt, QThread, Signal
 import pandas as pd
@@ -54,6 +54,7 @@ class StockDetailPage(QWidget):
         self._current_detail = {}
         self._worker: Optional[AIStreamWorker] = None
         self._init_ui()
+        self.refresh_watchlist_combo()
 
     def _init_ui(self):
         layout = QVBoxLayout(self)
@@ -70,6 +71,13 @@ class StockDetailPage(QWidget):
         self.lbl_price_info.setStyleSheet("color: #94A3B8; font-size: 13px; margin-left: 12px;")
         top_bar.addWidget(self.lbl_price_info)
         top_bar.addStretch()
+
+        # 自选股快速下拉选择
+        self.combo_watchlist = QComboBox()
+        self.combo_watchlist.setFixedWidth(170)
+        self.combo_watchlist.setToolTip("从您的自选股池中快速选择并切换标的")
+        self.combo_watchlist.currentIndexChanged.connect(self._on_watchlist_combo_selected)
+        top_bar.addWidget(self.combo_watchlist)
 
         # 代码搜索与即时切换框
         self.input_search = QLineEdit()
@@ -133,11 +141,40 @@ class StockDetailPage(QWidget):
         splitter.setStretchFactor(1, 2)
         layout.addWidget(splitter)
 
+    def refresh_watchlist_combo(self):
+        """刷新自选股快速下拉选择列表"""
+        self.combo_watchlist.blockSignals(True)
+        self.combo_watchlist.clear()
+
+        items = watchlist_service.get_watchlist_simple()
+        if not items:
+            self.combo_watchlist.addItem("⭐ 自选池为空", None)
+            self.combo_watchlist.setEnabled(False)
+        else:
+            self.combo_watchlist.setEnabled(True)
+            self.combo_watchlist.addItem("⭐ 快速切换自选股...", None)
+            selected_idx = 0
+            for idx, item in enumerate(items, start=1):
+                sym = item["symbol"]
+                name = item["name"]
+                self.combo_watchlist.addItem(f"{sym} {name}", sym)
+                if sym == self.current_symbol:
+                    selected_idx = idx
+            self.combo_watchlist.setCurrentIndex(selected_idx)
+
+        self.combo_watchlist.blockSignals(False)
+
+    def _on_watchlist_combo_selected(self, index: int):
+        """响应自选下拉框选择，快速切换标的"""
+        sym = self.combo_watchlist.currentData()
+        if sym and sym != self.current_symbol:
+            self.load_stock(sym)
+
     def load_stock(self, symbol: str):
         """加载展示指定股票的多维信息与 K 线"""
         self.current_symbol = str(symbol).zfill(6)
         self._current_detail = data_service.get_stock_detail(self.current_symbol)
-        
+
         name = self._current_detail.get("name", "A股标的")
         price = float(self._current_detail.get("close_price", 0.0))
         change = float(self._current_detail.get("change_pct", 0.0))
@@ -156,6 +193,15 @@ class StockDetailPage(QWidget):
         # 更新自选按钮文案
         in_fav = watchlist_service.is_in_watchlist(self.current_symbol)
         self.btn_fav.setText("已在自选" if in_fav else "加入自选")
+
+        # 同步更新自选下拉框高亮状态
+        self.combo_watchlist.blockSignals(True)
+        matched_idx = self.combo_watchlist.findData(self.current_symbol)
+        if matched_idx >= 0:
+            self.combo_watchlist.setCurrentIndex(matched_idx)
+        else:
+            self.combo_watchlist.setCurrentIndex(0)
+        self.combo_watchlist.blockSignals(False)
 
         # 刷新 K 线
         kline_df = self._current_detail.get("kline_df", pd.DataFrame())
@@ -251,6 +297,8 @@ class StockDetailPage(QWidget):
         else:
             watchlist_service.add_to_watchlist(self.current_symbol)
             self.btn_fav.setText("已在自选")
+        # 实时同步自选下拉框
+        self.refresh_watchlist_combo()
 
     def _on_search_stock(self):
         """手动搜索代码并切换当前标的"""
