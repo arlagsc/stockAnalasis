@@ -127,6 +127,77 @@ class DataFetcher:
         logger.info("外部网络通道暂时不可达，基于全量 %d 支标的池启用仿真行情引擎...", len(universe))
         return self._generate_fallback_basics(universe)
 
+    def fetch_specific_quotes(self, symbols: List[str]) -> Dict[str, Dict[str, Any]]:
+        """定向批量拉取指定标的的最新盘口行情（毫秒级单次网络请求，杜绝全市场扫描）
+
+        Args:
+            symbols: 股票代码列表，如 ["600519", "000001"]
+
+        Returns:
+            Dict[str, Dict[str, Any]]: 字典映射，key 为 6 位代码，value 包含 close_price、change_pct 等
+        """
+        import urllib.request
+
+        cleaned_symbols = [str(s).strip().zfill(6) for s in symbols if s]
+        if not cleaned_symbols:
+            return {}
+
+        def get_full_symbol(sym: str) -> str:
+            if sym.startswith(("60", "68")):
+                return f"sh{sym}"
+            elif sym.startswith(("00", "30")):
+                return f"sz{sym}"
+            elif sym.startswith(("43", "83", "87", "92")):
+                return f"bj{sym}"
+            return f"sz{sym}"
+
+        def safe_float(val: Any) -> float:
+            try:
+                if not val or val == "--":
+                    return 0.0
+                return float(val)
+            except Exception:
+                return 0.0
+
+        query = ",".join(get_full_symbol(c) for c in cleaned_symbols)
+        url = f"https://qt.gtimg.cn/q={query}"
+        req = urllib.request.Request(
+            url,
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        )
+
+        result_map: Dict[str, Dict[str, Any]] = {}
+        try:
+            with urllib.request.urlopen(req, timeout=4) as resp:
+                text = resp.read().decode("gbk", errors="ignore")
+                for line in text.split(";"):
+                    line = line.strip()
+                    if not line or "=" not in line:
+                        continue
+                    val_str = line.split("=", 1)[1].strip('"')
+                    parts = val_str.split("~")
+                    if len(parts) > 40:
+                        s_code = parts[2].zfill(6)
+                        s_name = parts[1].strip() or f"标的{s_code}"
+                        price = safe_float(parts[3])
+                        chg = safe_float(parts[32]) if len(parts) > 32 else 0.0
+                        vol = safe_float(parts[6]) if len(parts) > 6 else 0.0
+                        mkt_val = safe_float(parts[45]) if len(parts) > 45 else 0.0
+
+                        result_map[s_code] = {
+                            "symbol": s_code,
+                            "name": s_name,
+                            "close_price": price,
+                            "change_pct": chg,
+                            "volume": vol,
+                            "total_market_val": mkt_val,
+                        }
+            logger.info("定向高速通道已成功获取 %d 支标的实时盘口", len(result_map))
+        except Exception as e:
+            logger.warning("定向拉取盘口异常: %s", str(e))
+
+        return result_map
+
     def _fetch_tencent_realtime_basics(self, universe: List[Dict[str, str]]) -> pd.DataFrame:
         """通过腾讯官方高速接口批量并发拉取全市场实时行情 (5000+ 只全覆盖)"""
         import urllib.request

@@ -47,6 +47,19 @@ class AutoTradeWorker(QThread):
                 "executed_count": 0,
             })
 
+class PositionsQuoteWorker(QThread):
+    """持仓标的最新盘口后台异步刷新工作线程（定向毫秒级，杜绝阻塞 UI）"""
+
+    quotes_updated = Signal(bool)
+
+    def run(self):
+        try:
+            trading_service.refresh_positions_quotes()
+            self.quotes_updated.emit(True)
+        except Exception as e:
+            logger.error("后台异步刷新持仓盘口异常: %s", str(e))
+            self.quotes_updated.emit(False)
+
 class AutoTradeResultDialog(QDialog):
     """AI 自动建仓执行汇报弹窗"""
 
@@ -242,8 +255,11 @@ class VirtualTradingPage(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._quote_worker: Optional[PositionsQuoteWorker] = None
+        self._auto_worker: Optional[AutoTradeWorker] = None
         self._init_ui()
-        self.refresh_all()
+        self.load_local_data()
+        self.async_refresh_quotes(show_feedback=False)
 
     def _init_ui(self):
         layout = QVBoxLayout(self)
@@ -412,9 +428,8 @@ class VirtualTradingPage(QWidget):
 
         layout.addWidget(self.tabs)
 
-    def refresh_all(self):
-        """全量刷新盘口与界面数据"""
-        trading_service.refresh_positions_quotes()
+    def load_local_data(self):
+        """立即读取本地 SQLite 数据库已有数据渲染界面（首屏 0 延迟秒开）"""
         self._update_account_cards()
         self._render_positions_table()
         self._render_trades_table()
@@ -422,8 +437,47 @@ class VirtualTradingPage(QWidget):
         self._render_skills_table()
 
     def refresh_data(self):
-        """兼容主窗口生命周期调用的别名方法"""
-        self.refresh_all()
+        """生命周期切换触发：先秒开本地数据，再在后台静默定向刷新盘口"""
+        self.load_local_data()
+        self.async_refresh_quotes(show_feedback=False)
+
+    def refresh_all(self):
+        """用户点击【刷新盘口行情】按钮或交易后刷新：秒开本地后发起后台刷新"""
+        self.load_local_data()
+        self.async_refresh_quotes(show_feedback=True)
+
+    def async_refresh_quotes(self, show_feedback: bool = False):
+        """启动后台 Worker 异步定向刷新持仓价格（杜绝 UI 阻塞）"""
+        if self._quote_worker is not None and self._quote_worker.isRunning():
+            logger.debug("持仓盘口正在刷新中，跳过重复请求")
+            return
+
+        # 检查是否已有持仓，若完全无持仓则无需发起任何网络请求
+        man_pos = trading_service.get_positions("MANUAL")
+        ai_pos = trading_service.get_positions("AI")
+        if not man_pos and not ai_pos:
+            if show_feedback:
+                self.btn_refresh.setText("🔄 刷新盘口行情")
+            return
+
+        if show_feedback:
+            self.btn_refresh.setEnabled(False)
+            self.btn_refresh.setText("⏳ 正在刷新...")
+
+        self._quote_worker = PositionsQuoteWorker()
+        self._quote_worker.quotes_updated.connect(lambda ok: self._on_quotes_updated(ok, show_feedback))
+        self._quote_worker.start()
+
+    def _on_quotes_updated(self, success: bool, show_feedback: bool):
+        """后台定向拉取完成，在主线程静默更新卡片与持仓明细"""
+        if show_feedback:
+            self.btn_refresh.setEnabled(True)
+            self.btn_refresh.setText("🔄 刷新盘口行情")
+
+        # 仅平滑更新持仓与卡片数据，不重绘整个页面
+        self._update_account_cards()
+        self._render_positions_table()
+        self._render_pk_chart()
 
     def _update_account_cards(self):
         """刷新顶部人手与 AI 账户概览"""

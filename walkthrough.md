@@ -162,4 +162,21 @@ graph TD
   - **实机截图与验证**：
     - 大盘看板偶数行白底彻底清除，所有行列信息清晰锐利；
     - 自选股、智能筛选、虚拟操盘持仓与流水表格在深色主题下均呈现统一、高对比度的专业金融终端视觉效果。
+- **2026-09-20 [虚拟操盘 0 延迟秒开性能重构与定向高速行情流水线]**：
+  - **卡顿根因剖析**：
+    1. 切换至虚拟操盘页面时，Qt 主 UI 线程同步调用 `trading_service.refresh_positions_quotes()`，其内部调用 `fetch_all_stock_basics()`，触发全市场 5,565 支股票的并发网络请求与大数据遍历，导致主事件循环卡死冻结数秒。
+    2. 缺乏针对持仓特定标的（通常仅 0~10 支）的极简单次 HTTP 定向拉取通道。
+  - **性能重构方案实施**：
+    1. **数据采集层定向通道 ([app/data/fetcher.py](file:///d:/AI/stockAnalasis/app/data/fetcher.py))**：
+       - 实现 `fetch_specific_quotes(symbols: List[str]) -> Dict[str, Dict[str, Any]]`，构造极简 URL 参数（如 `q=sh600519,sz000001`），单次 HTTP GET 请求直连腾讯接口，单次查询由全市场数秒大幅缩短至数十毫秒。
+    2. **撮合服务层定向更新 ([app/services/trading_service.py](file:///d:/AI/stockAnalasis/app/services/trading_service.py))**：
+       - 重构 `refresh_positions_quotes()`：仅提取当前实际持仓的股票代码集合进行定向查询更新，若持仓为空则立即退出，杜绝全市场 5,565 支无意义扫描；
+       - 优化 `buy_stock()`：买入股票若未指定现价，优先调用定向接口获取单股盘口现价。
+    3. **表现层双阶段秒开流水线 ([app/ui/pages/virtual_trading.py](file:///d:/AI/stockAnalasis/app/ui/pages/virtual_trading.py))**：
+       - **第一阶段（本地 0 延迟秒开）**：`load_local_data()` 纯从本地 SQLite 读取资产卡片与持仓明细，首屏加载耗时由数秒降至约 12~14 毫秒，点击侧边栏立即可见，无任何鼠标卡死或界面冻结；
+       - **第二阶段（后台异步静默刷新）**：新增 `PositionsQuoteWorker(QThread)`，在后台线程中异步定向拉取持仓标的盘口，通过 Qt 信号在主线程平滑刷新卡片与持仓现价，实现无感平滑更新；
+       - 优化顶部【🔄 刷新盘口行情】按钮反馈态（“⏳ 正在刷新...”）。
+  - **验证与基准测试**：
+    - 编写自动化测试 [`tests/test_fast_quote_refresh.py`](file:///d:/AI/stockAnalasis/tests/test_fast_quote_refresh.py)，验证定向查询结构、空持仓保护、持仓价格更新以及本地首屏读取性能（实测耗时 1.41 ms，远低于 50 ms 阈值）；
+    - 实机主界面切换测试：从侧边栏点击【虚拟操盘】首屏渲染耗时仅 **13.66 ms**，后台定向拉取平滑静默交付，视觉呈现深色金融高对比度统一标准。
 

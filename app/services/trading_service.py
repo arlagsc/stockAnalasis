@@ -94,13 +94,19 @@ class TradingService:
         stock_name = "标的" + symbol
         price = custom_price
         if price is None or price <= 0:
-            df = data_fetcher.fetch_all_stock_basics()
-            if not df.empty and "symbol" in df.columns:
-                matched = df[df["symbol"] == symbol]
-                if not matched.empty:
-                    row = matched.iloc[0]
-                    price = float(row.get("close_price", 0.0))
-                    stock_name = str(row.get("name", stock_name))
+            q_map = data_fetcher.fetch_specific_quotes([symbol])
+            if symbol in q_map and q_map[symbol].get("close_price", 0.0) > 0:
+                price = float(q_map[symbol]["close_price"])
+                stock_name = str(q_map[symbol].get("name", stock_name))
+            else:
+                # 离线或备选本地数据库查询
+                df = data_fetcher.fetch_all_stock_basics()
+                if not df.empty and "symbol" in df.columns:
+                    matched = df[df["symbol"] == symbol]
+                    if not matched.empty:
+                        row = matched.iloc[0]
+                        price = float(row.get("close_price", 0.0))
+                        stock_name = str(row.get("name", stock_name))
 
         if price is None or price <= 0:
             price = 10.0  # 离线极值兜底
@@ -281,7 +287,7 @@ class TradingService:
                 p.available_amount = p.total_amount
 
     def refresh_positions_quotes(self, account_type: Optional[str] = None):
-        """通过腾讯高速通道批量刷新所有持仓标的的最新盘口价格与估值"""
+        """通过定向高速通道批量刷新持仓标的的最新盘口价格与估值（毫秒级，杜绝全市场 5565 支遍历）"""
         session = db_manager.get_session()
         try:
             query = session.query(VirtualPosition)
@@ -291,26 +297,25 @@ class TradingService:
             if not positions:
                 return
 
-            symbols = list(set([p.symbol for p in positions]))
-            # 批量获取盘口
-            basics_df = data_fetcher.fetch_all_stock_basics()
-            price_map = {}
-            if not basics_df.empty and "symbol" in basics_df.columns:
-                for _, row in basics_df.iterrows():
-                    s = str(row["symbol"]).zfill(6)
-                    if s in symbols:
-                        price_map[s] = float(row.get("close_price", 0.0))
+            symbols = list(set([p.symbol for p in positions if p.symbol]))
+            if not symbols:
+                return
+
+            # 定向批量获取持仓标的盘口价格
+            quote_map = data_fetcher.fetch_specific_quotes(symbols)
 
             today_str = date.today().strftime("%Y-%m-%d")
             for p in positions:
-                if p.symbol in price_map and price_map[p.symbol] > 0:
-                    p.current_price = price_map[p.symbol]
+                if p.symbol in quote_map:
+                    latest_p = quote_map[p.symbol].get("close_price", 0.0)
+                    if latest_p > 0:
+                        p.current_price = latest_p
                 # T+1 解冻校验
                 if p.last_buy_date and p.last_buy_date != today_str:
                     p.available_amount = p.total_amount
 
             session.commit()
-            logger.info("已成功批量刷新持仓最新价格，覆盖标的数: %d", len(symbols))
+            logger.info("已成功批量定向刷新持仓最新价格，覆盖标的数: %d", len(symbols))
         except Exception as e:
             session.rollback()
             logger.error("刷新持仓盘口异常: %s", str(e))
