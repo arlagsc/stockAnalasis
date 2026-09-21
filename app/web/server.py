@@ -90,6 +90,17 @@ class MobileServerManager:
             logger.info("移动端 Web 服务已在运行中，无需重复启动。")
             return
 
+        # 检查端口是否已被外部进程或先前的实例占用
+        import socket
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(0.5)
+            if s.connect_ex(("127.0.0.1", port)) == 0:
+                logger.warning("检测到端口 %d 已被系统其他进程或正在运行的 StockAI 实例占用！", port)
+                logger.info("移动端 Web 服务可能已就绪，可直接在手机浏览器访问: %s", lan_url)
+                if not blocking:
+                    cls._is_running = True
+                return
+
         lan_url, _ = cls.get_access_urls(port)
         logger.info("正在启动 StockAI iPhone 移动端服务，绑定: %s:%d ...", host, port)
         logger.info("iPhone 同局域网访问地址: %s", lan_url)

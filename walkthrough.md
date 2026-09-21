@@ -469,5 +469,11 @@ graph TD
     1. 将 [`app/services/scheduler_service.py`](file:///d:/AI/stockAnalasis/app/services/scheduler_service.py) 中的 `SchedulerState` 继承自 `str, Enum`，使其既作为字符串值直接参与逻辑比较，又兼容 `.value` 属性读取；
     2. 在 [`app/ui/pages/virtual_trading.py`](file:///d:/AI/stockAnalasis/app/ui/pages/virtual_trading.py) 中规范状态判断逻辑，直接与枚举对象比对（`state == SchedulerState.RUNNING`），增强代码健壮性；
     3. 执行单元测试验证通过，状态切换正常。
+- **2026-09-21 [增加移动端 Web 服务 8000 端口占用预检与防冲突优雅提示]**：
+  - **问题根因**：用户在桌面端【设置】点击“启动移动端服务”或再次在终端运行 `run_mobile_server.py` 时，若后台已有正在运行的 StockAI 实例或其他程序占用了 `8000` 端口，Uvicorn 在尝试 `bind` 时将抛出 `[Errno 10048] [winerror 10048] 每个套接字地址只允许使用一次`。
+  - **优化方案**：
+    1. 在 [`app/web/server.py`](file:///d:/AI/stockAnalasis/app/web/server.py) 的 `MobileServerManager.start()` 中增加 `socket` 端口预检；
+    2. 检测到 8000 端口被占用时，避免抛出崩溃性异常，而是输出温和告警，并提示用户服务可能已经在后台运行，可直接通过浏览器或局域网访问；
+    3. 若为桌面端后台守护线程模式，自动同步更新 UI 状态为已连接，避免弹窗打断用户操作。
 
 
