@@ -636,9 +636,104 @@ body {
   border-color: rgba(168, 85, 247, 0.4);
 }
 
-/* AI 一键全自动建仓按钮 */
+/* AI 一键全自动建仓按钮与无人值守控制台 */
 .ai-action-bar {
   margin-bottom: 14px;
+}
+
+.scheduler-card {
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.75) 0%, rgba(15, 23, 42, 0.9) 100%);
+  border: 1px solid rgba(124, 58, 237, 0.3);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.scheduler-top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.scheduler-status-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-indicator-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.dot-running {
+  background-color: #10B981;
+  box-shadow: 0 0 10px #10B981;
+  animation: pulse 1.5s infinite;
+}
+
+.dot-stopped {
+  background-color: #64748B;
+}
+
+.dot-emergency {
+  background-color: #EF4444;
+  box-shadow: 0 0 12px #EF4444;
+  animation: pulse 0.8s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(0.95); opacity: 0.8; }
+  50% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(0.95); opacity: 0.8; }
+}
+
+.scheduler-status-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.scheduler-subtext {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.scheduler-actions-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-scheduler-toggle {
+  background: #2563EB;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-scheduler-toggle.active {
+  background: #059669;
+}
+
+.btn-emergency-kill {
+  background: #DC2626;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 8px;
+  cursor: pointer;
 }
 
 .btn-ai-autotrade {

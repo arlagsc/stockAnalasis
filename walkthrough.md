@@ -64,6 +64,7 @@ graph TD
 | [`app/services/screener_service.py`](file:///d:/AI/stockAnalasis/app/services/screener_service.py) | `ScreenerService.screen_by_natural_language()`<br>`ScreenerService.execute_filter_plan()` | 两阶段漏斗筛选：本地量化粗排将 5000+ 只降至 20~50 候选池 + 自然语言选股。 |
 | [`app/services/recommend_service.py`](file:///d:/AI/stockAnalasis/app/services/recommend_service.py) | `RecommendService.generate_recommendations()` | 复合因子综合评分 + 动态注入活跃操盘军规 + 大模型深度精选。 |
 | [`app/services/watchlist_service.py`](file:///d:/AI/stockAnalasis/app/services/watchlist_service.py) | `WatchlistService.add_to_watchlist()`<br>`WatchlistService.get_watchlist_with_quotes()` | 自选股池增删改查、自定义分组及与实时量价行情合并。 |
+| [`app/services/scheduler_service.py`](file:///d:/AI/stockAnalasis/app/services/scheduler_service.py) | `AutonomousScheduler.start()`<br>`AutonomousScheduler.pause()`<br>`AutonomousScheduler.emergency_stop()`<br>`AutonomousScheduler.reset_emergency_stop()` | A 股交易节律后台守护引擎：精准驱动 09:35 进攻建仓、盘中 15 分钟巡检风控、14:45 尾盘定型与 15:30 收盘复盘，内置全局急停熔断。 |
 
 ### 3.4 表现层 (`app/ui/`)
 | 文件路径 | 核心类 / 关键控件 | 功能说明 |
@@ -428,5 +429,39 @@ graph TD
     - `L3 实盘全自动托管`：接入 QMT/MiniQMT，配置大盘暴跌熔断、单日账户回撤熔断与全局急停断电开关。
   - **架构成果归档**：
     - 完整架构设计说明书已持久化保存至 [`docs/autonomous_trading_architecture.md`](file:///d:/AI/stockAnalasis/docs/autonomous_trading_architecture.md)。
+- **2026-09-21 [自主操盘常驻调度引擎驱动、双端状态监控与全局急停断电熔断 (Milestone 1)]**：
+  - **业务背景与核心诉求**：
+    - 实现 AI 自主操盘无人值守接管，必须摆脱人工点击单次触发的限制，建立常驻后台交易时钟驱动机制。
+    - 必须精确对齐 A 股盘中交易节律，并在桌面端与移动端提供实时的托管状态感知、一键启停和全局物理级急停断电熔断（Kill Switch）。
+  - **核心调度引擎落地 ([app/services/scheduler_service.py](file:///d:/AI/stockAnalasis/app/services/scheduler_service.py))**：
+    - 实现单例 `AutonomousScheduler` 与状态机 `SchedulerState`（`STOPPED` / `RUNNING` / `PAUSED` / `EMERGENCY`）；
+    - 实现 A 股交易日与盘中时段精确裁决（`is_trade_day`、`is_trade_time`、`get_current_phase_info`）；
+    - 守护线程按 10 秒时钟轮询四大节律事件：
+      1. `09:35`：早盘进攻与冲高止盈，驱动多因子粗排与军规建仓管线；
+      2. `10:00 - 14:40`：每 15 分钟轻量巡检硬止损（-5%）与 MA20 破位平仓；
+      3. `14:45`：尾盘形态定型与次日跨日建仓；
+      4. `15:30`：收盘全天交易归因复盘与军规自进化整理；
+    - 建立全局急停断电机制（`emergency_stop()` 与 `reset_emergency_stop()`），在熔断状态下强行锁死所有自动化线程并阻断启动，内存维护最近 50 条审计流水日志。
+  - **后端 API 路由扩展 ([app/web/api.py](file:///d:/AI/stockAnalasis/app/web/api.py))**：
+    - 挂载 4 个交易调度管理端点：
+      - `GET /api/trading/scheduler/status`：获取当前所处交易节律、下一预定动作、运行状态与审计日志；
+      - `POST /api/trading/scheduler/toggle`：开启或暂停 AI 无人值守交易托管；
+      - `POST /api/trading/scheduler/emergency-stop`：一键触发全局紧急急停断电熔断；
+      - `POST /api/trading/scheduler/reset-emergency`：人工确认解除急停锁定。
+  - **移动端 PWA 交互与视觉实现 ([app/web/static/](file:///d:/AI/stockAnalasis/app/web/static/))**：
+    - 在 `index.html` 的 AI 操盘操作区顶部新增 `.scheduler-card` 状态卡片；
+    - 在 `style.css` 中引入状态呼吸灯动效（`.dot-running` 绿色脉冲、`.dot-emergency` 红色闪烁警示、`.dot-stopped` 冷灰待机）；
+    - 在 `app.js` 中实现 `loadSchedulerStatus()`、`toggleAutonomousScheduler()` 与 `triggerEmergencyKill()`，在急停状态下动态切换按钮文案与响应事件。
+  - **桌面端 PySide6 联动 ([app/ui/pages/virtual_trading.py](file:///d:/AI/stockAnalasis/app/ui/pages/virtual_trading.py))**：
+    - 顶部操作栏挂载【开启无人托管】与【急停】按键；
+    - 在 `load_local_data` 与交易刷新生命周期中绑定 `_update_scheduler_ui`；
+    - 实现 `_on_toggle_scheduler` 与 `_on_emergency_kill`，提供二次高危确认弹窗与状态持久同步。
+  - **自动化测试与实机验证**：
+    - 新增单元测试套件 [`tests/test_scheduler.py`](file:///d:/AI/stockAnalasis/tests/test_scheduler.py)，涵盖状态机转换、交易时间判定、阶段描述提取与 4 个 API 路由端点验证，8 项测试 100% 通过；
+    - 联合回归运行 `test_auto_sell.py` 与 `test_mobile_api.py`，累计 23 项测试全量通过；
+    - 借助 Playwright 截取 iPhone 14 Pro 视口真实运行截图：
+      - 待机就绪状态：[`iphone_scheduler_standby.png`](file:///C:/Users/Administrator/.gemini/antigravity-ide/brain/5e5def10-41bd-4e75-af5e-5503515c3964/iphone_scheduler_standby.png)
+      - 运行中脉冲状态：[`iphone_scheduler_running.png`](file:///C:/Users/Administrator/.gemini/antigravity-ide/brain/5e5def10-41bd-4e75-af5e-5503515c3964/iphone_scheduler_running.png)
+      - 全局急停断电熔断状态：[`iphone_scheduler_emergency.png`](file:///C:/Users/Administrator/.gemini/antigravity-ide/brain/5e5def10-41bd-4e75-af5e-5503515c3964/iphone_scheduler_emergency.png)
 
 

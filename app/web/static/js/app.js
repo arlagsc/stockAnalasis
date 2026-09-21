@@ -659,6 +659,9 @@ function switchTradeAccount(accountType) {
 
   // 重新加载数据
   loadTradingData();
+  if (isAI) {
+    loadSchedulerStatus();
+  }
 }
 
 async function loadTradingData() {
@@ -1122,3 +1125,102 @@ document.addEventListener('DOMContentLoaded', () => {
   // 默认激活全景大盘
   switchTab('tab-market');
 });
+
+// 6. 加载与刷新 AI 无人值守调度器状态
+async function loadSchedulerStatus() {
+  const dotEl = document.getElementById('scheduler-dot');
+  const statusText = document.getElementById('scheduler-status-text');
+  const phaseText = document.getElementById('scheduler-phase-text');
+  const btnToggle = document.getElementById('btn-scheduler-toggle');
+  if (!dotEl || !statusText) return;
+
+  try {
+    const res = await fetch('/api/trading/scheduler/status');
+    const data = await res.json();
+
+    const isRunning = data.is_running;
+    const stateName = data.state;
+
+    // 更新指示灯
+    dotEl.className = 'status-indicator-dot ' + (
+      stateName === 'EMERGENCY' ? 'dot-emergency' :
+      isRunning ? 'dot-running' : 'dot-stopped'
+    );
+
+    // 更新文字与动作
+    if (stateName === 'EMERGENCY') {
+      statusText.textContent = '🚨 紧急断电熔断锁死';
+      statusText.style.color = '#EF4444';
+      phaseText.textContent = '调度已强行切断，点击解除紧急锁定';
+      if (btnToggle) {
+        btnToggle.textContent = '解除急停';
+        btnToggle.className = 'btn-scheduler-toggle';
+        btnToggle.onclick = resetEmergencyKill;
+      }
+    } else if (isRunning) {
+      statusText.textContent = '🟢 全自动托管运行中';
+      statusText.style.color = '#10B981';
+      phaseText.textContent = `当前: ${data.current_phase} ｜ 下一步: ${data.next_action}`;
+      if (btnToggle) {
+        btnToggle.textContent = '暂停托管';
+        btnToggle.className = 'btn-scheduler-toggle active';
+        btnToggle.onclick = () => toggleAutonomousScheduler(false);
+      }
+    } else {
+      statusText.textContent = '全自动无人操盘: 待机中';
+      statusText.style.color = 'var(--text-primary)';
+      phaseText.textContent = `当前: ${data.current_phase} ｜ 预定: ${data.next_action}`;
+      if (btnToggle) {
+        btnToggle.textContent = '开启托管';
+        btnToggle.className = 'btn-scheduler-toggle';
+        btnToggle.onclick = () => toggleAutonomousScheduler(true);
+      }
+    }
+  } catch (err) {
+    console.warn('获取调度状态失败', err);
+  }
+}
+
+// 启停切换调度器
+async function toggleAutonomousScheduler(enable) {
+  try {
+    showToast(enable ? '正在启动 AI 无人值守操盘守护...' : '正在暂停托管...');
+    const res = await fetch(`/api/trading/scheduler/toggle?enable=${enable}&account_type=AI`, { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+      showToast(data.message);
+      loadSchedulerStatus();
+    } else {
+      alert(`操作失败: ${data.message}`);
+    }
+  } catch (err) {
+    alert(`网络请求异常: ${err.message}`);
+  }
+}
+
+// 紧急急停断电
+async function triggerEmergencyKill() {
+  if (!confirm('【高危确认】确定要触发全局紧急急停断电吗？这将立即熔断所有自动交易调度线程并冻结交易！')) {
+    return;
+  }
+  try {
+    const res = await fetch('/api/trading/scheduler/emergency-stop', { method: 'POST' });
+    const data = await res.json();
+    showToast('🚨 紧急急停已执行！系统已切断自动化调度');
+    loadSchedulerStatus();
+  } catch (err) {
+    alert(`急停调用失败: ${err.message}`);
+  }
+}
+
+// 解除急停
+async function resetEmergencyKill() {
+  try {
+    const res = await fetch('/api/trading/scheduler/reset-emergency', { method: 'POST' });
+    const data = await res.json();
+    showToast('紧急急停锁定已解除');
+    loadSchedulerStatus();
+  } catch (err) {
+    alert(`解除急停异常: ${err.message}`);
+  }
+}

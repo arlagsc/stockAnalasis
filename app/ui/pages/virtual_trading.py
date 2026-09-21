@@ -29,6 +29,7 @@ from app.services.auto_trader import auto_trader
 from app.ai.skill_engine import skill_engine
 from app.data.fetcher import data_fetcher
 from app.services.watchlist_service import watchlist_service
+from app.services.scheduler_service import scheduler_service, SchedulerState
 
 class AutoTradeWorker(QThread):
     """AI 自动计算建仓后台异步工作线程"""
@@ -500,7 +501,17 @@ class VirtualTradingPage(QWidget):
         self.btn_auto_sell.clicked.connect(self._on_auto_sell_clicked)
         top_bar.addWidget(self.btn_auto_sell)
 
-        self.btn_refresh = QPushButton("🔄 刷新盘口行情")
+        self.btn_auto_manage = QPushButton("🤖 开启无人托管")
+        self.btn_auto_manage.setStyleSheet("background-color: #059669; font-weight: bold; color: #FFFFFF; padding: 6px 12px; border-radius: 4px;")
+        self.btn_auto_manage.clicked.connect(self._on_toggle_scheduler)
+        top_bar.addWidget(self.btn_auto_manage)
+
+        self.btn_kill_switch = QPushButton("🚨 急停")
+        self.btn_kill_switch.setStyleSheet("background-color: #DC2626; font-weight: bold; color: #FFFFFF; padding: 6px 10px; border-radius: 4px;")
+        self.btn_kill_switch.clicked.connect(self._on_emergency_kill)
+        top_bar.addWidget(self.btn_kill_switch)
+
+        self.btn_refresh = QPushButton("🔄 刷新盘口")
         self.btn_refresh.clicked.connect(self.refresh_all)
         top_bar.addWidget(self.btn_refresh)
 
@@ -651,6 +662,7 @@ class VirtualTradingPage(QWidget):
         self._render_trades_table()
         self._render_pk_chart()
         self._render_skills_table()
+        self._update_scheduler_ui()
 
     def refresh_data(self):
         """生命周期切换触发：先秒开本地数据，再在后台静默定向刷新盘口"""
@@ -987,3 +999,73 @@ class VirtualTradingPage(QWidget):
 
         # 全量刷新盘口与账户状态
         self.refresh_all()
+
+    def _update_scheduler_ui(self):
+        """根据自主调度中枢状态更新托管与急停按钮显示"""
+        try:
+            status = scheduler_service.get_status()
+            state = status.get("state", "STOPPED")
+            next_action = status.get("next_action_info", "")
+
+            if state == SchedulerState.RUNNING.value:
+                self.btn_auto_manage.setText("⏸️ 暂停无人托管")
+                self.btn_auto_manage.setEnabled(True)
+                self.btn_auto_manage.setStyleSheet("background-color: #D97706; font-weight: bold; color: #FFFFFF; padding: 6px 12px; border-radius: 4px;")
+                self.btn_auto_manage.setToolTip(f"无人值守已激活 | 下一步: {next_action}")
+                self.btn_kill_switch.setEnabled(True)
+                self.btn_kill_switch.setText("🚨 全局急停")
+                self.btn_kill_switch.setStyleSheet("background-color: #DC2626; font-weight: bold; color: #FFFFFF; padding: 6px 10px; border-radius: 4px;")
+            elif state == SchedulerState.EMERGENCY.value:
+                self.btn_auto_manage.setText("🤖 开启无人托管")
+                self.btn_auto_manage.setEnabled(False)
+                self.btn_auto_manage.setStyleSheet("background-color: #475569; font-weight: bold; color: #94A3B8; padding: 6px 12px; border-radius: 4px;")
+                self.btn_kill_switch.setEnabled(True)
+                self.btn_kill_switch.setText("🔓 解除急停")
+                self.btn_kill_switch.setStyleSheet("background-color: #059669; font-weight: bold; color: #FFFFFF; padding: 6px 10px; border-radius: 4px;")
+                self.btn_kill_switch.setToolTip("系统当前处于急停熔断状态，点击重置")
+            else:
+                self.btn_auto_manage.setText("🤖 开启无人托管")
+                self.btn_auto_manage.setEnabled(True)
+                self.btn_auto_manage.setStyleSheet("background-color: #059669; font-weight: bold; color: #FFFFFF; padding: 6px 12px; border-radius: 4px;")
+                self.btn_auto_manage.setToolTip("开启全自动盘中节律盯盘与盘后进化")
+                self.btn_kill_switch.setEnabled(True)
+                self.btn_kill_switch.setText("🚨 急停")
+                self.btn_kill_switch.setStyleSheet("background-color: #DC2626; font-weight: bold; color: #FFFFFF; padding: 6px 10px; border-radius: 4px;")
+        except Exception as e:
+            logger.error(f"刷新调度器 UI 状态异常: {e}")
+
+    def _on_toggle_scheduler(self):
+        """切换自主操盘托管开关"""
+        status = scheduler_service.get_status()
+        state = status.get("state", "STOPPED")
+        if state == SchedulerState.RUNNING.value:
+            scheduler_service.pause()
+            QMessageBox.information(self, "无人托管已暂停", "AI 自主无人托管调度已转为暂停状态。")
+        elif state == SchedulerState.EMERGENCY.value:
+            QMessageBox.warning(self, "系统急停锁定", "当前处于全局急停熔断状态，请先点击【解除急停】。")
+        else:
+            scheduler_service.start()
+            QMessageBox.information(self, "无人托管已激活", "AI 自主无人托管调度引擎已在后台常驻运行！\n包含：09:35 早盘建仓、盘中 15 分钟巡检硬止损、14:45 尾盘定型与 15:30 收盘复盘。")
+        self._update_scheduler_ui()
+
+    def _on_emergency_kill(self):
+        """急停断电或解除急停"""
+        status = scheduler_service.get_status()
+        state = status.get("state", "STOPPED")
+        if state == SchedulerState.EMERGENCY.value:
+            reply = QMessageBox.question(
+                self, "确认解除急停", "确认解除全局急停锁定状态吗？系统将恢复为待命状态。",
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+            )
+            if reply == QMessageBox.Yes:
+                scheduler_service.reset_emergency_stop()
+                QMessageBox.information(self, "已恢复待命", "急停状态已解除，系统恢复就绪。")
+        else:
+            reply = QMessageBox.critical(
+                self, "⚠️ 全局急停确认", "警告：触发急停将立即切断所有自动建仓、巡检平仓与报单线程！\n是否确认立即执行急停断电？",
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+            )
+            if reply == QMessageBox.Yes:
+                scheduler_service.emergency_stop(reason="桌面端用户人工强制按下急停按键")
+                QMessageBox.warning(self, "🚨 已全局熔断急停", "所有自动化执行管线已被物理切断，请排查原因后再行解除。")
+        self._update_scheduler_ui()

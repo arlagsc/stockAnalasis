@@ -23,6 +23,7 @@ from app.services.watchlist_service import watchlist_service
 from app.services.trading_service import trading_service
 from app.services.recommend_service import recommend_service
 from app.services.auto_trader import auto_trader
+from app.services.scheduler_service import scheduler_service
 from app.ai.skill_engine import skill_engine
 from app.data.fetcher import data_fetcher
 
@@ -437,6 +438,70 @@ async def execute_auto_sell(req: Optional[AutoSellRequest] = None) -> Dict[str, 
             "locked_items": [],
             "sold_count": 0
         }
+
+@app.get("/api/trading/scheduler/status")
+async def get_scheduler_status() -> Dict[str, Any]:
+    """获取 AI 无人值守操盘调度引擎运行状态与节律数据"""
+    try:
+        st = scheduler_service.get_status()
+        resp = {"success": True, "data": st}
+        resp.update(st)
+        return resp
+    except Exception as e:
+        logger.error("获取调度状态异常: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/trading/scheduler/toggle")
+async def toggle_scheduler(enable: Optional[bool] = None, account_type: str = "AI", payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """开启或暂停 AI 无人值守交易托管（兼容 Query 与 Body 参数）"""
+    try:
+        is_enable = enable
+        if is_enable is None and payload and "action" in payload:
+            is_enable = (payload.get("action") == "start")
+        if is_enable is None:
+            is_enable = True
+
+        acc = (payload.get("account_type") if payload else None) or account_type
+        if is_enable:
+            ok = scheduler_service.start(account_type=acc)
+            msg = "AI 无人值守操盘已成功启动" if ok else "启动失败"
+        else:
+            ok = scheduler_service.pause()
+            msg = "AI 无人值守操盘已暂停"
+        st = scheduler_service.get_status()
+        resp = {"success": ok, "message": msg, "data": st, "status": st}
+        resp.update(st)
+        return resp
+    except Exception as e:
+        logger.error("切换调度器状态异常: %s", e)
+        return {"success": False, "message": str(e)}
+
+@app.post("/api/trading/scheduler/emergency-stop")
+async def trigger_emergency_stop(payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """🚨 触发全局一键紧急急停断电熔断"""
+    try:
+        reason = (payload.get("reason") if payload else "用户触发紧急急停断电")
+        res = scheduler_service.emergency_stop(reason=reason)
+        st = scheduler_service.get_status()
+        resp = {"success": True, "message": "紧急急停断电已执行", "data": st}
+        resp.update(st)
+        return resp
+    except Exception as e:
+        logger.error("触发急停异常: %s", e)
+        return {"success": False, "msg": str(e)}
+
+@app.post("/api/trading/scheduler/reset-emergency")
+async def reset_emergency_stop() -> Dict[str, Any]:
+    """解除紧急断电锁定"""
+    try:
+        ok = scheduler_service.reset_emergency_stop()
+        st = scheduler_service.get_status()
+        resp = {"success": ok, "message": "紧急断电锁定已解除", "data": st}
+        resp.update(st)
+        return resp
+    except Exception as e:
+        logger.error("解除急停异常: %s", e)
+        return {"success": False, "message": str(e)}
 
 @app.post("/api/trading/buy")
 async def execute_buy(req: BuyOrderRequest) -> Dict[str, Any]:

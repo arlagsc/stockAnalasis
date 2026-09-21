@@ -197,6 +197,23 @@
 
     <!-- AI 专属全自动操作工具条 (切换为 AI 时显式呈现) -->
     <div id="ai-action-bar" class="ai-action-bar" style="display: none;">
+      <!-- AI 无人值守自动操盘托管控制台 -->
+      <div class="scheduler-card">
+        <div class="scheduler-top-row">
+          <div class="scheduler-status-left">
+            <span id="scheduler-dot" class="status-indicator-dot dot-stopped"></span>
+            <div>
+              <div id="scheduler-status-text" class="scheduler-status-title">全自动无人操盘: 待机中</div>
+              <div id="scheduler-phase-text" class="scheduler-subtext">下一动作: 09:35 早盘进攻</div>
+            </div>
+          </div>
+          <div class="scheduler-actions-right">
+            <button id="btn-scheduler-toggle" class="btn-scheduler-toggle" onclick="toggleAutonomousScheduler()">开启托管</button>
+            <button id="btn-kill-switch" class="btn-emergency-kill" onclick="triggerEmergencyKill()" title="紧急急停断电">🚨 急停</button>
+          </div>
+        </div>
+      </div>
+
       <div style="display: flex; gap: 8px;">
         <button class="btn-ai-autotrade" style="flex: 1;" onclick="triggerAutoTrade()">
           <span>🤖 AI 一键建仓</span>
@@ -205,7 +222,7 @@
           <span>🛡️ AI 巡检平仓</span>
         </button>
       </div>
-      <div class="ai-action-subtip">建仓: 多因子粗选+军规裁决 ｜ 平仓: T+1+止损止盈+技术破位避险</div>
+      <div class="ai-action-subtip">节律: 09:35进攻 ｜ 15分钟巡检 ｜ 14:45定型 ｜ 15:30收盘复盘</div>
     </div>
 
     <!-- 当前持仓明细 -->
