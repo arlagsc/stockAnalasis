@@ -847,6 +847,110 @@ function closeAutoTradeModal() {
   if (modal) modal.classList.remove('active');
 }
 
+// 触发 AI 一键智能持仓巡检与自动平仓
+async function triggerAutoSell() {
+  const btn = document.querySelector('.btn-ai-autosell');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳ 正在巡检持仓与形态诊断...</span>';
+  }
+
+  showToast('AI 正在执行持仓止损止盈与形态巡检...');
+
+  try {
+    const res = await fetch('/api/trading/auto-sell', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        account_type: 'AI',
+        stop_loss_pct: -5.0,
+        take_profit_pct: 10.0,
+        enable_tech_breakdown: true,
+        enable_llm_eval: true
+      })
+    });
+    const data = await res.json();
+
+    const modal = document.getElementById('auto-sell-modal');
+    const msgEl = document.getElementById('auto-sell-msg');
+    const listEl = document.getElementById('auto-sell-results-list');
+
+    if (msgEl) msgEl.textContent = data.msg || '巡检执行完成';
+
+    if (listEl) {
+      let html = '';
+      const sold = data.sold_items || [];
+      const held = data.held_items || [];
+      const locked = data.locked_items || [];
+
+      if (sold.length === 0 && held.length === 0 && locked.length === 0) {
+        html = '<div style="padding:20px; text-align:center; color:var(--text-muted); font-size:12px;">当前无任何持仓标的，无需平仓</div>';
+      } else {
+        if (sold.length > 0) {
+          html += `<div style="font-size:12px; font-weight:bold; color:#EF4444; margin:6px 0 4px 0;">🚨 触发平仓卖出标的 (${sold.length} 支):</div>`;
+          html += sold.map(item => `
+            <div class="auto-bought-card" style="border-left: 3px solid #EF4444;">
+              <div class="auto-bought-top">
+                <span class="auto-bought-name">${item.name} (${item.symbol})</span>
+                <span class="badge ${item.realized_pnl >= 0 ? 'badge-up' : 'badge-down'}">${item.trigger_type}</span>
+              </div>
+              <div class="auto-bought-detail">
+                卖出均价: ${formatPrice(item.sell_price)} 元 | 数量: ${item.amount} 股 | 结算盈亏: <span style="font-weight:bold; color:${item.realized_pnl >= 0 ? '#EF4444' : '#10B981'}">${item.realized_pnl >= 0 ? '+' : ''}${item.realized_pnl}元 (${Number(item.realized_pct || 0).toFixed(2)}%)</span>
+              </div>
+              <div class="auto-bought-reason">💡 卖出原因: ${item.reason}</div>
+            </div>
+          `).join('');
+        }
+
+        if (locked.length > 0) {
+          html += `<div style="font-size:12px; font-weight:bold; color:#FCD34D; margin:10px 0 4px 0;">⏳ T+1 锁定持仓 (${locked.length} 支):</div>`;
+          html += locked.map(item => `
+            <div class="auto-bought-card" style="border-left: 3px solid #FCD34D;">
+              <div class="auto-bought-top">
+                <span class="auto-bought-name">${item.name} (${item.symbol})</span>
+                <span style="font-size:11px; color:#FCD34D;">${item.status}</span>
+              </div>
+              <div class="auto-bought-detail">总持股: ${item.total_amount} 股 (今日可卖: 0) | 当前浮动: ${Number(item.floating_pnl_pct || 0).toFixed(2)}%</div>
+            </div>
+          `).join('');
+        }
+
+        if (held.length > 0) {
+          html += `<div style="font-size:12px; font-weight:bold; color:#10B981; margin:10px 0 4px 0;">🛡️ 走势健康继续持有 (${held.length} 支):</div>`;
+          html += held.map(item => `
+            <div class="auto-bought-card" style="border-left: 3px solid #10B981;">
+              <div class="auto-bought-top">
+                <span class="auto-bought-name">${item.name} (${item.symbol})</span>
+                <span style="font-size:11px; color:#10B981;">继续持有</span>
+              </div>
+              <div class="auto-bought-detail">持股: ${item.total_amount} 股 | 浮动盈亏: ${Number(item.floating_pnl_pct || 0).toFixed(2)}% | 状态: ${item.status}</div>
+            </div>
+          `).join('');
+        }
+      }
+      listEl.innerHTML = html;
+    }
+
+    if (modal) modal.classList.add('active');
+
+    // 重新刷新操盘数据和技能库
+    loadTradingData();
+    loadTradingSkills();
+  } catch (err) {
+    alert(`AI 自动巡检平仓失败: ${err.message}`);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<span>🛡️ AI 巡检平仓</span>';
+    }
+  }
+}
+
+function closeAutoSellModal() {
+  const modal = document.getElementById('auto-sell-modal');
+  if (modal) modal.classList.remove('active');
+}
+
 function handleFabClick() {
   if (state.currentTradeAccount === 'AI') {
     triggerAutoTrade();

@@ -195,12 +195,17 @@
       </div>
     </div>
 
-    <!-- AI 专属自动建仓快捷工具条 (仅在 AI 模式下高亮展示) -->
+    <!-- AI 专属全自动操作工具条 (切换为 AI 时显式呈现) -->
     <div id="ai-action-bar" class="ai-action-bar" style="display: none;">
-      <button class="btn-ai-autotrade" onclick="triggerAutoTrade()">
-        <span>🤖 AI 一键全自动计算建仓</span>
-      </button>
-      <div class="ai-action-subtip">基于 5565 支多因子粗选 + 操盘军规裁决 + T+1 纪律锁定</div>
+      <div style="display: flex; gap: 8px;">
+        <button class="btn-ai-autotrade" style="flex: 1;" onclick="triggerAutoTrade()">
+          <span>🤖 AI 一键建仓</span>
+        </button>
+        <button class="btn-ai-autosell" style="flex: 1;" onclick="triggerAutoSell()">
+          <span>🛡️ AI 巡检平仓</span>
+        </button>
+      </div>
+      <div class="ai-action-subtip">建仓: 多因子粗选+军规裁决 ｜ 平仓: T+1+止损止盈+技术破位避险</div>
     </div>
 
     <!-- 当前持仓明细 -->
@@ -270,6 +275,21 @@
         <!-- 动态生成 AI 买入卡片 -->
       </div>
       <button class="btn-primary" style="background: linear-gradient(135deg, #7C3AED 0%, #A855F7 100%);" onclick="closeAutoTradeModal()">确认并同步持仓</button>
+    </div>
+  </div>
+
+  <!-- AI 自动巡检平仓报告抽屉 (Bottom Sheet) -->
+  <div id="auto-sell-modal" class="modal-overlay" onclick="if(event.target===this)closeAutoSellModal()">
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <div class="modal-title" style="color: #F97316;">🛡️ AI 智能持仓巡检报告</div>
+        <button class="modal-close" onclick="closeAutoSellModal()">&times;</button>
+      </div>
+      <div id="auto-sell-msg" style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.5;"></div>
+      <div id="auto-sell-results-list" style="display:flex; flex-direction:column; gap:10px; max-height: 320px; overflow-y:auto; margin-bottom: 14px;">
+        <!-- 动态生成 AI 卖出与持仓卡片 -->
+      </div>
+      <button class="btn-primary" style="background: linear-gradient(135deg, #EA580C 0%, #F97316 100%);" onclick="closeAutoSellModal()">完成并刷新盘口</button>
     </div>
   </div>
 

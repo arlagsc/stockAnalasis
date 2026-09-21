@@ -663,6 +663,28 @@ body {
   transform: scale(0.98);
 }
 
+.btn-ai-autosell {
+  width: 100%;
+  background: linear-gradient(135deg, #EA580C 0%, #F97316 100%);
+  color: #FFFFFF;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 8px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(249, 115, 22, 0.35);
+  transition: transform 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.btn-ai-autosell:active {
+  transform: scale(0.98);
+}
+
 .ai-action-subtip {
   font-size: 10px;
   color: var(--text-muted);

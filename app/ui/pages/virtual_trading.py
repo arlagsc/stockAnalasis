@@ -133,6 +133,155 @@ class AutoTradeResultDialog(QDialog):
         btn_close.clicked.connect(self.accept)
         layout.addWidget(btn_close)
 
+class AutoSellWorker(QThread):
+    """AI 自动巡检与智能平仓后台异步工作线程"""
+
+    finished_signal = Signal(dict)
+
+    def __init__(self, account_type="AI", stop_loss_pct=-5.0, take_profit_pct=10.0, parent=None):
+        super().__init__(parent)
+        self.account_type = account_type
+        self.stop_loss_pct = stop_loss_pct
+        self.take_profit_pct = take_profit_pct
+
+    def run(self):
+        try:
+            res = auto_trader.execute_auto_selling(
+                account_type=self.account_type,
+                stop_loss_pct=self.stop_loss_pct,
+                take_profit_pct=self.take_profit_pct,
+                enable_tech_breakdown=True,
+                enable_llm_eval=True
+            )
+            self.finished_signal.emit(res)
+        except Exception as e:
+            logger.error("AI 自动巡检平仓工作线程异常: %s", str(e))
+            self.finished_signal.emit({
+                "success": False,
+                "msg": f"巡检平仓异常: {str(e)}",
+                "sold_items": [],
+                "held_items": [],
+                "locked_items": [],
+                "sold_count": 0,
+            })
+
+class AutoSellResultDialog(QDialog):
+    """AI 持仓巡检与自动平仓决策报告弹窗"""
+
+    def __init__(self, result: Dict[str, Any], parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("AI 智能持仓巡检与平仓报告")
+        self.resize(580, 480)
+        self.setStyleSheet("background-color: #0F172A; color: #E2E8F0; font-size: 13px;")
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+
+        lbl_head = QLabel("🛡️ AI 持仓智能体检与自动平仓报告")
+        lbl_head.setStyleSheet("font-size: 16px; font-weight: bold; color: #FB923C;")
+        layout.addWidget(lbl_head)
+
+        lbl_summary = QLabel(result.get("msg", ""))
+        lbl_summary.setWordWrap(True)
+        lbl_summary.setStyleSheet("color: #94A3B8; font-size: 12px; line-height: 1.4;")
+        layout.addWidget(lbl_summary)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet("border: none; background: transparent;")
+        content_w = QWidget()
+        l_cards = QVBoxLayout(content_w)
+        l_cards.setSpacing(10)
+
+        sold = result.get("sold_items", [])
+        locked = result.get("locked_items", [])
+        held = result.get("held_items", [])
+
+        if not sold and not locked and not held:
+            lbl_none = QLabel("当前账户无任何持仓，无需执行平仓。")
+            lbl_none.setStyleSheet("color: #64748B; font-style: italic; padding: 20px;")
+            l_cards.addWidget(lbl_none)
+        else:
+            # 1. 触发平仓标的
+            if sold:
+                lbl_s_title = QLabel(f"🚨 触发平仓卖出标的 ({len(sold)} 支):")
+                lbl_s_title.setStyleSheet("font-weight: bold; color: #EF4444; font-size: 13px; margin-top: 4px;")
+                l_cards.addWidget(lbl_s_title)
+                for item in sold:
+                    card = QFrame()
+                    card.setStyleSheet("background-color: #1E293B; border-radius: 6px; border-left: 3px solid #EF4444; padding: 8px;")
+                    lc = QVBoxLayout(card)
+                    lc.setSpacing(4)
+
+                    h1 = QHBoxLayout()
+                    lbl_n = QLabel(f"{item['name']} ({item['symbol']})")
+                    lbl_n.setStyleSheet("font-weight: bold; color: #F8FAFC;")
+                    pnl_val = item.get("realized_pnl", 0.0)
+                    pnl_pct = item.get("realized_pct", 0.0)
+                    c_color = "#EF4444" if pnl_val >= 0 else "#10B981"
+                    lbl_pnl = QLabel(f"实现盈亏: {pnl_val:+.2f}元 ({pnl_pct:+.2f}%)")
+                    lbl_pnl.setStyleSheet(f"font-weight: bold; color: {c_color};")
+                    h1.addWidget(lbl_n)
+                    h1.addStretch()
+                    h1.addWidget(lbl_pnl)
+                    lc.addLayout(h1)
+
+                    lbl_d = QLabel(f"成交均价: {item['sell_price']:.2f} 元 | 卖出股数: {item['amount']:,} 股 | 触发类型: {item['trigger_type']}")
+                    lbl_d.setStyleSheet("color: #CBD5E1; font-size: 12px;")
+                    lc.addWidget(lbl_d)
+
+                    lbl_r = QLabel(f"💡 决策原因: {item['reason']}")
+                    lbl_r.setWordWrap(True)
+                    lbl_r.setStyleSheet("color: #FCD34D; font-size: 11px; background-color: #0F172A; padding: 6px; border-radius: 4px;")
+                    lc.addWidget(lbl_r)
+
+                    l_cards.addWidget(card)
+
+            # 2. T+1 锁定持仓
+            if locked:
+                lbl_l_title = QLabel(f"⏳ T+1 纪律锁定持仓 ({len(locked)} 支，次日解冻):")
+                lbl_l_title.setStyleSheet("font-weight: bold; color: #FCD34D; font-size: 13px; margin-top: 8px;")
+                l_cards.addWidget(lbl_l_title)
+                for item in locked:
+                    card = QFrame()
+                    card.setStyleSheet("background-color: #1E293B; border-radius: 6px; border-left: 3px solid #FCD34D; padding: 8px;")
+                    lc = QVBoxLayout(card)
+                    lc.setSpacing(4)
+                    lbl_n = QLabel(f"{item['name']} ({item['symbol']}) - 总持股 {item['total_amount']:,} 股 (今日可卖: 0)")
+                    lbl_n.setStyleSheet("font-weight: bold; color: #FCD34D;")
+                    lbl_sub = QLabel(f"当前浮动: {item['floating_pnl_pct']:+.2f}% | 状态: {item['status']}")
+                    lbl_sub.setStyleSheet("color: #94A3B8; font-size: 12px;")
+                    lc.addWidget(lbl_n)
+                    lc.addWidget(lbl_sub)
+                    l_cards.addWidget(card)
+
+            # 3. 走势健康继续持有
+            if held:
+                lbl_h_title = QLabel(f"🛡️ 走势健康继续持有 ({len(held)} 支):")
+                lbl_h_title.setStyleSheet("font-weight: bold; color: #10B981; font-size: 13px; margin-top: 8px;")
+                l_cards.addWidget(lbl_h_title)
+                for item in held:
+                    card = QFrame()
+                    card.setStyleSheet("background-color: #1E293B; border-radius: 6px; border-left: 3px solid #10B981; padding: 8px;")
+                    lc = QVBoxLayout(card)
+                    lc.setSpacing(4)
+                    lbl_n = QLabel(f"{item['name']} ({item['symbol']}) - 持股 {item['total_amount']:,} 股 | 浮动盈亏: {item['floating_pnl_pct']:+.2f}%")
+                    lbl_n.setStyleSheet("font-weight: bold; color: #38BDF8;")
+                    lbl_sub = QLabel(f"体检状态: {item['status']}")
+                    lbl_sub.setStyleSheet("color: #10B981; font-size: 12px;")
+                    lc.addWidget(lbl_n)
+                    lc.addWidget(lbl_sub)
+                    l_cards.addWidget(card)
+
+        l_cards.addStretch()
+        scroll.setWidget(content_w)
+        layout.addWidget(scroll)
+
+        btn_ok = QPushButton("确 认 并 刷 新")
+        btn_ok.setStyleSheet("background-color: #EA580C; font-weight: bold; color: #FFFFFF; padding: 8px; border-radius: 4px;")
+        btn_ok.clicked.connect(self.accept)
+        layout.addWidget(btn_ok)
+
 class BuyDialog(QDialog):
     """虚拟建仓下单弹窗"""
 
@@ -345,6 +494,11 @@ class VirtualTradingPage(QWidget):
         self.btn_auto_buy.setStyleSheet("background-color: #7C3AED; font-weight: bold; color: #FFFFFF; padding: 6px 14px; border-radius: 4px;")
         self.btn_auto_buy.clicked.connect(self._on_auto_trade_clicked)
         top_bar.addWidget(self.btn_auto_buy)
+
+        self.btn_auto_sell = QPushButton("🛡️ AI 一键巡检平仓")
+        self.btn_auto_sell.setStyleSheet("background-color: #EA580C; font-weight: bold; color: #FFFFFF; padding: 6px 14px; border-radius: 4px;")
+        self.btn_auto_sell.clicked.connect(self._on_auto_sell_clicked)
+        top_bar.addWidget(self.btn_auto_sell)
 
         self.btn_refresh = QPushButton("🔄 刷新盘口行情")
         self.btn_refresh.clicked.connect(self.refresh_all)
@@ -808,6 +962,27 @@ class VirtualTradingPage(QWidget):
         
         # 弹出执行成果报告
         dlg = AutoTradeResultDialog(result, parent=self)
+        dlg.exec()
+
+        # 全量刷新盘口与账户状态
+        self.refresh_all()
+
+    def _on_auto_sell_clicked(self):
+        """点击触发 AI 智能持仓巡检与自动平仓管线"""
+        self.btn_auto_sell.setEnabled(False)
+        self.btn_auto_sell.setText("🛡️ 正在巡检持仓与形态诊断中...")
+
+        self._sell_worker = AutoSellWorker(account_type="AI", stop_loss_pct=-5.0, take_profit_pct=10.0)
+        self._sell_worker.finished_signal.connect(self._on_auto_sell_finished)
+        self._sell_worker.start()
+
+    def _on_auto_sell_finished(self, result: Dict[str, Any]):
+        """AI 自动巡检平仓完成回调"""
+        self.btn_auto_sell.setEnabled(True)
+        self.btn_auto_sell.setText("🛡️ AI 一键巡检平仓")
+
+        # 弹出执行成果报告
+        dlg = AutoSellResultDialog(result, parent=self)
         dlg.exec()
 
         # 全量刷新盘口与账户状态

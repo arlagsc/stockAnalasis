@@ -101,6 +101,13 @@ class SellOrderRequest(BaseModel):
     price: Optional[float] = Field(default=None, description="自定义卖出价，为空则使用现价")
     reason: Optional[str] = Field(default="手机端平仓了结", description="平仓原因")
 
+class AutoSellRequest(BaseModel):
+    account_type: str = Field(default="AI", description="巡检账户类型 MANUAL 或 AI")
+    stop_loss_pct: float = Field(default=-5.0, description="硬止损比例阈值")
+    take_profit_pct: float = Field(default=10.0, description="目标止盈比例阈值")
+    enable_tech_breakdown: bool = Field(default=True, description="是否开启技术均线破位避险")
+    enable_llm_eval: bool = Field(default=True, description="是否启用大模型操盘军规形态裁决")
+
 class AddWatchlistRequest(BaseModel):
     symbol: str = Field(description="6 位股票代码")
     group_name: Optional[str] = Field(default="默认自选", description="所属分组名称")
@@ -401,6 +408,35 @@ async def execute_auto_trade(max_buy_count: int = 2) -> Dict[str, Any]:
     except Exception as e:
         logger.error("移动端执行 AI 自动建仓异常: %s", e)
         return {"success": False, "msg": f"AI 自动建仓异常: {str(e)}", "bought_items": [], "executed_count": 0}
+
+@app.post("/api/trading/auto-sell")
+async def execute_auto_sell(req: Optional[AutoSellRequest] = None) -> Dict[str, Any]:
+    """触发 AI 持仓智能巡检与自动平仓决策管线"""
+    try:
+        acc_type = (req.account_type if req and req.account_type else "AI").upper()
+        stop_loss = req.stop_loss_pct if req else -5.0
+        take_profit = req.take_profit_pct if req else 10.0
+        enable_tech = req.enable_tech_breakdown if req else True
+        enable_llm = req.enable_llm_eval if req else True
+
+        res = auto_trader.execute_auto_selling(
+            account_type=acc_type,
+            stop_loss_pct=stop_loss,
+            take_profit_pct=take_profit,
+            enable_tech_breakdown=enable_tech,
+            enable_llm_eval=enable_llm
+        )
+        return res
+    except Exception as e:
+        logger.error("移动端执行 AI 自动巡检平仓异常: %s", e)
+        return {
+            "success": False,
+            "msg": f"AI 自动巡检平仓异常: {str(e)}",
+            "sold_items": [],
+            "held_items": [],
+            "locked_items": [],
+            "sold_count": 0
+        }
 
 @app.post("/api/trading/buy")
 async def execute_buy(req: BuyOrderRequest) -> Dict[str, Any]:

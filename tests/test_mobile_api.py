@@ -136,7 +136,10 @@ async def test_market_rankings_api():
 
 @pytest.mark.anyio
 async def test_ai_trading_and_skills_api():
-    """测试人机操盘对比、AI 军规技能与自动建仓接口"""
+    """测试人机操盘对比、AI 军规技能、自动建仓与自动巡检平仓接口"""
+    from unittest.mock import patch
+    from app.services.auto_trader import auto_trader
+
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         # 1. 人机收益对比
@@ -154,10 +157,30 @@ async def test_ai_trading_and_skills_api():
         skills_data = res_skills.json()
         assert isinstance(skills_data, list)
 
-        # 3. AI 自动建仓管线响应
-        res_auto = await client.post("/api/trading/auto-trade?max_buy_count=1")
-        assert res_auto.status_code == 200
-        auto_data = res_auto.json()
-        assert "success" in auto_data
-        assert "msg" in auto_data
-        assert "bought_items" in auto_data
+        # 3. AI 自动建仓管线响应 (带 Mock 极速执行)
+        mock_buy_res = {"success": True, "msg": "建仓完成", "bought_items": [], "executed_count": 0}
+        with patch.object(auto_trader, "execute_auto_trading", return_value=mock_buy_res):
+            res_auto = await client.post("/api/trading/auto-trade?max_buy_count=1")
+            assert res_auto.status_code == 200
+            auto_data = res_auto.json()
+            assert "success" in auto_data
+            assert "msg" in auto_data
+            assert "bought_items" in auto_data
+
+        # 4. AI 自动持仓巡检平仓响应 (带 Mock 极速执行)
+        mock_sell_res = {
+            "success": True,
+            "msg": "巡检完成",
+            "sold_items": [],
+            "held_items": [],
+            "locked_items": [],
+            "sold_count": 0
+        }
+        with patch.object(auto_trader, "execute_auto_selling", return_value=mock_sell_res):
+            res_sell = await client.post("/api/trading/auto-sell", json={"account_type": "AI"})
+            assert res_sell.status_code == 200
+            sell_data = res_sell.json()
+            assert sell_data["success"] is True
+            assert "sold_items" in sell_data
+            assert "held_items" in sell_data
+            assert "locked_items" in sell_data
