@@ -402,11 +402,24 @@ graph TD
     5. **自动化测试与实机验证 ([tests/test_mobile_api.py](file:///d:/AI/stockAnalasis/tests/test_mobile_api.py), [tests/test_iphone_ai_trading.py](file:///d:/AI/stockAnalasis/tests/test_iphone_ai_trading.py))**：
        - 新增 `test_ai_trading_and_skills_api` 自动化用例，9 项测试 100% 通过；
        - 使用 Playwright 模拟真实 iPhone 14 Pro 视口（393 x 852），截取人类主观操盘与 PK 战报、AI 智能操盘模式与 AI 自动建仓决策报告弹窗，全流程验证通过。
-
-
-
-
-
-
+- **2026-09-21 [修复桌面端数据表格涨跌幅与最新价文字被 QSS 强制覆盖为白色的缺陷]**：
+  - **缺陷现象与根因剖析**：
+    - 用户反馈大盘看板等数据表格中，“涨跌幅”及“最新价”未能按照中国股市标准显示红（涨）绿（跌）文字，所有数值均呈现单一白色。
+    - 经排查定位，在 [`app/ui/pages/dashboard.py`](file:///d:/AI/stockAnalasis/app/ui/pages/dashboard.py)、[`app/ui/pages/watchlist.py`](file:///d:/AI/stockAnalasis/app/ui/pages/watchlist.py) 及 [`app/ui/pages/screener.py`](file:///d:/AI/stockAnalasis/app/ui/pages/screener.py) 代码中，均已显式根据涨跌正负调用了 `item.setForeground(QColor("#F87171"))`（明亮红）与 `item.setForeground(QColor("#34D399"))`（翡翠绿）。
+    - 根本原因在于全局样式表 [`app/ui/theme.py`](file:///d:/AI/stockAnalasis/app/ui/theme.py) 的 `QTableWidget::item, QTableView::item` 和 `QTableWidget::item:alternate, QTableView::item:alternate` 选择器中硬编码了 `color: #F1F5F9;` 以及 `:hover` 中的 `color: #FFFFFF;`。在 Qt 样式引擎（QStyledItemDelegate）渲染规则中，子选择器 `::item` 上的 CSS `color` 会强制覆盖数据项的 `Qt.ForegroundRole`，导致所有正负着色逻辑被全量刷白。
+  - **修复方案**：
+    1. **样式表解耦 ([app/ui/theme.py](file:///d:/AI/stockAnalasis/app/ui/theme.py))**：
+       - 从 `QTableWidget::item` 和 `QTableWidget::item:alternate` 选择器中移除硬编码的 `color` 属性，保留单元格内边距 `padding: 6px 8px;` 及深色交替行背景；
+       - 从 `:hover` 和 `:selected` 伪类中移除硬编码的 `color: #FFFFFF;`，仅保留背景色渐变过渡（`#222836` 与 `#1E3A8A`），避免鼠标悬浮或选中时文字闪烁覆盖；
+       - 由父级 `QTableWidget` 保留基准 `color: #F8FAFC;` 作为默认文本颜色（应用于代码、简称、成交量等无涨跌属性的列）。
+    2. **全页面联动收益**：
+       - **市场全景看板 (Dashboard)**：最新价与涨跌幅恢复明亮红（涨）、翡翠绿（跌）、浅冷灰（平）；
+       - **自选股票池 (Watchlist)**：最新价与涨跌幅恢复红绿显示；
+       - **智能选股 (Screener)**：筛选结果涨跌幅与价格恢复红绿显示；
+       - **虚拟操盘 (Virtual Trading)**：浮动盈亏（金额及比例）恢复红绿显示，可卖锁定期展示明黄提示。
+  - **实机像素级测试与渲染核验**：
+    - 编写自动化像素比对测试脚本，确认修复前 QSS 渲染红色像素为 0，修复后红色像素与翡翠绿像素 100% 正确绘制；
+    - 使用 PySide6 实机离屏渲染完整 14 支大盘行情数据，生成对比截图并归档至 artifacts 目录（`dashboard_table_fixed_full.png` 与 `dashboard_page_fixed_full.png`）；
+    - 运行 `pytest tests/test_mobile_api.py -v`，全量自动化用例 100% 通过。
 
 

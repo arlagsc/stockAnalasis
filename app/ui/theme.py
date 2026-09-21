@@ -165,21 +165,17 @@ QTableWidget, QTableView {
 }
 QTableWidget::item, QTableView::item {
     background-color: transparent;
-    color: #F1F5F9;
     padding: 6px 8px;
     border: none;
 }
 QTableWidget::item:alternate, QTableView::item:alternate {
     background-color: #171B24;
-    color: #F1F5F9;
 }
 QTableWidget::item:selected, QTableView::item:selected {
     background-color: #1E3A8A;
-    color: #FFFFFF;
 }
 QTableWidget::item:hover, QTableView::item:hover {
     background-color: #222836;
-    color: #FFFFFF;
 }
 QTableWidget QPushButton, QTableView QPushButton {
     min-height: 24px;
