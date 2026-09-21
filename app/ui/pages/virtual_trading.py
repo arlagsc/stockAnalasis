@@ -1007,7 +1007,7 @@ class VirtualTradingPage(QWidget):
             state = status.get("state", "STOPPED")
             next_action = status.get("next_action_info", "")
 
-            if state == SchedulerState.RUNNING.value:
+            if state == SchedulerState.RUNNING:
                 self.btn_auto_manage.setText("⏸️ 暂停无人托管")
                 self.btn_auto_manage.setEnabled(True)
                 self.btn_auto_manage.setStyleSheet("background-color: #D97706; font-weight: bold; color: #FFFFFF; padding: 6px 12px; border-radius: 4px;")
@@ -1015,7 +1015,7 @@ class VirtualTradingPage(QWidget):
                 self.btn_kill_switch.setEnabled(True)
                 self.btn_kill_switch.setText("🚨 全局急停")
                 self.btn_kill_switch.setStyleSheet("background-color: #DC2626; font-weight: bold; color: #FFFFFF; padding: 6px 10px; border-radius: 4px;")
-            elif state == SchedulerState.EMERGENCY.value:
+            elif state in (SchedulerState.EMERGENCY, SchedulerState.EMERGENCY_STOP):
                 self.btn_auto_manage.setText("🤖 开启无人托管")
                 self.btn_auto_manage.setEnabled(False)
                 self.btn_auto_manage.setStyleSheet("background-color: #475569; font-weight: bold; color: #94A3B8; padding: 6px 12px; border-radius: 4px;")
@@ -1038,10 +1038,10 @@ class VirtualTradingPage(QWidget):
         """切换自主操盘托管开关"""
         status = scheduler_service.get_status()
         state = status.get("state", "STOPPED")
-        if state == SchedulerState.RUNNING.value:
+        if state == SchedulerState.RUNNING:
             scheduler_service.pause()
             QMessageBox.information(self, "无人托管已暂停", "AI 自主无人托管调度已转为暂停状态。")
-        elif state == SchedulerState.EMERGENCY.value:
+        elif state in (SchedulerState.EMERGENCY, SchedulerState.EMERGENCY_STOP):
             QMessageBox.warning(self, "系统急停锁定", "当前处于全局急停熔断状态，请先点击【解除急停】。")
         else:
             scheduler_service.start()
@@ -1052,7 +1052,7 @@ class VirtualTradingPage(QWidget):
         """急停断电或解除急停"""
         status = scheduler_service.get_status()
         state = status.get("state", "STOPPED")
-        if state == SchedulerState.EMERGENCY.value:
+        if state in (SchedulerState.EMERGENCY, SchedulerState.EMERGENCY_STOP):
             reply = QMessageBox.question(
                 self, "确认解除急停", "确认解除全局急停锁定状态吗？系统将恢复为待命状态。",
                 QMessageBox.Yes | QMessageBox.No, QMessageBox.No

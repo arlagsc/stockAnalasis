@@ -463,5 +463,11 @@ graph TD
       - 待机就绪状态：[`iphone_scheduler_standby.png`](file:///C:/Users/Administrator/.gemini/antigravity-ide/brain/5e5def10-41bd-4e75-af5e-5503515c3964/iphone_scheduler_standby.png)
       - 运行中脉冲状态：[`iphone_scheduler_running.png`](file:///C:/Users/Administrator/.gemini/antigravity-ide/brain/5e5def10-41bd-4e75-af5e-5503515c3964/iphone_scheduler_running.png)
       - 全局急停断电熔断状态：[`iphone_scheduler_emergency.png`](file:///C:/Users/Administrator/.gemini/antigravity-ide/brain/5e5def10-41bd-4e75-af5e-5503515c3964/iphone_scheduler_emergency.png)
+- **2026-09-21 [修复桌面端开启无人托管 AttributeError: 'str' object has no attribute 'value' 缺陷]**：
+  - **问题根因**：桌面端 `virtual_trading.py` 中对 `SchedulerState.RUNNING.value` 进行属性取值，而 `scheduler_service.py` 中的 `SchedulerState` 原为纯类字符串常量定义，未继承 `Enum`，导致字符串对象调用 `.value` 抛出 AttributeError。
+  - **修复措施**：
+    1. 将 [`app/services/scheduler_service.py`](file:///d:/AI/stockAnalasis/app/services/scheduler_service.py) 中的 `SchedulerState` 继承自 `str, Enum`，使其既作为字符串值直接参与逻辑比较，又兼容 `.value` 属性读取；
+    2. 在 [`app/ui/pages/virtual_trading.py`](file:///d:/AI/stockAnalasis/app/ui/pages/virtual_trading.py) 中规范状态判断逻辑，直接与枚举对象比对（`state == SchedulerState.RUNNING`），增强代码健壮性；
+    3. 执行单元测试验证通过，状态切换正常。
 
 

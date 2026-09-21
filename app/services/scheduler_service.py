@@ -13,6 +13,7 @@ import threading
 import time
 from datetime import datetime, date, time as dtime
 from typing import Dict, Any, List, Optional
+from enum import Enum
 
 from app.core.config import logger
 from app.services.auto_trader import auto_trader
@@ -20,7 +21,7 @@ from app.services.trading_service import trading_service
 from app.ai.skill_engine import skill_engine
 
 
-class SchedulerState:
+class SchedulerState(str, Enum):
     STOPPED = "STOPPED"          # 未启动
     RUNNING = "RUNNING"          # 正常运行中
     PAUSED = "PAUSED"            # 手动暂停
