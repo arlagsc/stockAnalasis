@@ -475,5 +475,31 @@ graph TD
     1. 在 [`app/web/server.py`](file:///d:/AI/stockAnalasis/app/web/server.py) 的 `MobileServerManager.start()` 中增加 `socket` 端口预检；
     2. 检测到 8000 端口被占用时，避免抛出崩溃性异常，而是输出温和告警，并提示用户服务可能已经在后台运行，可直接通过浏览器或局域网访问；
     3. 若为桌面端后台守护线程模式，自动同步更新 UI 状态为已连接，避免弹窗打断用户操作。
+- **2026-09-23 [修复 AI 托管自动建仓在模型超时时本地量化兜底失效且空仓观望缺陷]**：
+  - **故障现象**：AI 接管运行期间剩余资金充足，但一直没有新建仓。调度日志显示 09:35 进攻建仓调用大模型 `qwen3.8-vllm` 出现 `Request timed out`，系统随后切换为“启用本地多因子量化评选引擎进行自动建仓决策...”，但后续并未产生任何买入撮合，直接跳过并进入后续风控巡检。
+  - **排查与根因分析**：
+    1. **核心缺陷**：[`app/services/auto_trader.py`](file:///d:/AI/stockAnalasis/app/services/auto_trader.py) 中的 `_fallback_local_evaluation()` 方法在完成多因子评分前 2 支候选标的字典构建后，**缺失了 `return res` 语句**，导致该函数默认隐式返回 `None`；
+    2. **降级击穿**：当大模型因网络延迟或并发导致一次性请求超时时，建仓管线试图调用本地量化兜底，但由于返回了 `None`，触发了 `if not decisions:` 条件，被系统判定为“候选标的均未通过操盘军规胜率检验，系统决定空仓观望”，导致整轮建仓直接退出；
+    3. **时钟节律限制**：根据 [`AutonomousScheduler`](file:///d:/AI/stockAnalasis/app/services/scheduler_service.py) 节律设定，自动建仓仅在 `09:35` 早盘和 `14:45` 尾盘各触发一次，其余盘中每 15 分钟均为“持仓风控巡检（仅负责平仓避险）”。因此 09:35 遭遇该缺陷退出后，整个上午均处于巡检状态，不会再次尝试建仓，导致资金持续闲置。
+  - **修复措施**：
+    1. 在 `_fallback_local_evaluation()` 末尾显式添加 `return res`，并在函数内增加兜底选股结果的关键 Debug 日志；
+    2. 在 `execute_auto_trading()` 裁决决策判断点补充 Warning 与 Info 级别日志，增强决策链路的可观察性；
+    3. 编写回归测试用例 [`tests/test_fallback_buying.py`](file:///d:/AI/stockAnalasis/tests/test_fallback_buying.py)，模拟大模型超时场景，全链路验证本地多因子量化选股与 A 股仿真撮合买入，测试 100% 通过。
+- **2026-09-23 [大模型实操调用实测、耗时瓶颈分析与超时窗口专项优化]**：
+  - **实测执行与连通性验证**：
+    1. 连通性诊断：目标端点 `http://172.16.154.242:11434/v1`，模型 `qwen3.8-vllm`，三项诊断指标（Latency、Streaming、JSON 解析）全部通过；
+    2. 实战 Prompt 耗时测量：首字用时（TTFT）为 11.09 秒，带军规与候选池的建仓推理生成总耗时为 33.34 秒；
+    3. 真实建仓端到端撮合：成功在 34 秒内完成 10 支标的裁决，成功提取结构化 JSON 并撮合买入 2 支优质标的（上海瀚讯 600 股、唯科科技 800 股），均符合操盘军规突破战则。
+  - **超时参数瓶颈与调优**：
+    1. 原配置中大模型客户端超时绑定为普通数据请求的 3 倍（`config.request_timeout_seconds * 3` 即 30 秒），而私有部署 `qwen3.8-vllm` 在推理 10 支标的与操盘军规时的耗时处于 30~45 秒区间，极易触碰 30 秒硬超时红线；
+    2. 在 [`app/core/config.py`](file:///d:/AI/stockAnalasis/app/core/config.py) 中新增大模型专用超时时长配置 `llm_timeout_seconds = 120`；
+    3. 在 [`app/ai/llm_client.py`](file:///d:/AI/stockAnalasis/app/ai/llm_client.py) 中解耦普通网络请求与 LLM 超时，统一使用 120 秒安全窗口，彻底消除网络与长推理阶段的偶发性超时问题。
+- **2026-09-23 [修复仿真撮合买入时股票简称缺失导致显示为“标的代码”缺陷]**：
+  - **问题分析**：在 `trading_service.py` 的 `buy_stock` 函数中，若外部传入自定义成交价格 `custom_price`，原逻辑会直接跳过标的真实名称获取分支，导致持仓表与成交流水表中股票名称存为占位符“标的+代码”（例如“标的301057”）；
+  - **修复实现**：
+    1. 为 `buy_stock` 补充 `name` 入参并在 `auto_trader.py` 撮合调用时直接透传标的真实名称；
+    2. 在缺少名称或名称为占位符时，不论是否传入 `custom_price` 均通过定向盘口接口或基础数据源补充真实中文简称；
+    3. 在 `refresh_positions_quotes()` 批量刷新盘口时，增加对存量占位名称的自动修正逻辑；
+    4. 存量持仓与成交流水已全量刷新为规范中文名称（唯科科技、腾景科技）。
 
 

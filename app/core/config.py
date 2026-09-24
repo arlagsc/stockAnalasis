@@ -97,6 +97,7 @@ class AppConfig:
         self.current_provider_name = "DeepSeek"
         self.cache_expiry_hours = 4  # 日线/基础行情缓存过期时长（小时）
         self.request_timeout_seconds = 10  # 数据网络请求超时时长（秒）
+        self.llm_timeout_seconds = 120  # 大模型推理专用超时时长（秒，预留长提示词与私有部署响应窗口）
         self.max_retry_times = 3  # 网络失败最大重试次数
 
     def _setup_logging(self):

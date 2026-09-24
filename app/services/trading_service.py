@@ -77,6 +77,7 @@ class TradingService:
         symbol: str,
         amount: int,
         custom_price: Optional[float] = None,
+        name: Optional[str] = None,
         reason: str = "手动择时买入"
     ) -> Tuple[bool, str]:
         """执行仿真建仓买入操作
@@ -91,22 +92,34 @@ class TradingService:
             return False, "买入股数必须为 100 的整数倍 (至少 1 手 100 股)"
 
         # 获取标的盘口现价与名称
-        stock_name = "标的" + symbol
+        stock_name = (name or "").strip()
+        if not stock_name or stock_name.startswith("标的"):
+            stock_name = "标的" + symbol
+
         price = custom_price
-        if price is None or price <= 0:
+        need_quote = (price is None or price <= 0 or stock_name.startswith("标的"))
+
+        if need_quote:
             q_map = data_fetcher.fetch_specific_quotes([symbol])
-            if symbol in q_map and q_map[symbol].get("close_price", 0.0) > 0:
-                price = float(q_map[symbol]["close_price"])
-                stock_name = str(q_map[symbol].get("name", stock_name))
-            else:
+            if symbol in q_map:
+                if price is None or price <= 0:
+                    price = float(q_map[symbol].get("close_price", 0.0))
+                fetched_name = str(q_map[symbol].get("name", "")).strip()
+                if fetched_name:
+                    stock_name = fetched_name
+            
+            if stock_name.startswith("标的") or price is None or price <= 0:
                 # 离线或备选本地数据库查询
                 df = data_fetcher.fetch_all_stock_basics()
                 if not df.empty and "symbol" in df.columns:
                     matched = df[df["symbol"] == symbol]
                     if not matched.empty:
                         row = matched.iloc[0]
-                        price = float(row.get("close_price", 0.0))
-                        stock_name = str(row.get("name", stock_name))
+                        if price is None or price <= 0:
+                            price = float(row.get("close_price", 0.0))
+                        fetched_name = str(row.get("name", "")).strip()
+                        if fetched_name:
+                            stock_name = fetched_name
 
         if price is None or price <= 0:
             price = 10.0  # 离线极值兜底
@@ -310,6 +323,9 @@ class TradingService:
                     latest_p = quote_map[p.symbol].get("close_price", 0.0)
                     if latest_p > 0:
                         p.current_price = latest_p
+                    real_name = str(quote_map[p.symbol].get("name", "")).strip()
+                    if real_name and (not p.name or p.name.startswith("标的")):
+                        p.name = real_name
                 # T+1 解冻校验
                 if p.last_buy_date and p.last_buy_date != today_str:
                     p.available_amount = p.total_amount

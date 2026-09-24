@@ -82,7 +82,10 @@ class AutoTrader:
 
         if not decisions:
             msg = "AI 形态裁决完成：候选标的均未通过操盘军规胜率检验，系统决定空仓观望。"
+            logger.warning(msg)
             return {"success": False, "msg": msg, "bought_items": [], "executed_count": 0}
+
+        logger.info("AI 裁决引擎最终确认拟建仓决策 %d 条，准备进入动态分仓与撮合执行", len(decisions))
 
         # 4. 依据评分梯度执行动态分仓与仿真撮合
         bought_items = []
@@ -134,6 +137,7 @@ class AutoTrader:
                 symbol=sym,
                 amount=target_amount,
                 custom_price=price,
+                name=name,
                 reason=reason
             )
 
@@ -278,6 +282,13 @@ class AutoTrader:
                 "score": round(c.get("quant_score", 80.0) + 10.0, 1),
                 "reason": f"基于本地多因子量化模型：涨跌幅与量价换手共振（换手率 {c['turnover_rate']:.2f}%），契合顺势建仓规则。",
             })
+        logger.info(
+            "本地多因子量化兜底评选完成，已优选 %d 支标的: %s",
+            len(res),
+            ", ".join([f"{x['name']}({x['symbol']})" for x in res]) if res else "无"
+        )
+        return res
+
     def execute_auto_selling(
         self,
         account_type: str = "AI",

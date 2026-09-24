@@ -44,7 +44,7 @@ class LLMClient:
             return OpenAI(
                 base_url=provider_conf.base_url,
                 api_key=api_key,
-                timeout=config.request_timeout_seconds * 3,
+                timeout=getattr(config, "llm_timeout_seconds", 120),
             )
         except Exception as e:
             logger.error("构建 OpenAI 客户端实例异常: %s", str(e))
