@@ -184,3 +184,39 @@ async def test_ai_trading_and_skills_api():
             assert "sold_items" in sell_data
             assert "held_items" in sell_data
             assert "locked_items" in sell_data
+
+@pytest.mark.anyio
+async def test_trades_history_and_pk_curve_and_skills_toggle():
+    """测试历史成交流水、收益曲线走势及操盘军规切换接口"""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # 1. 历史成交流水
+        res_trades = await client.get("/api/trading/trades?account_type=AI&limit=10")
+        assert res_trades.status_code == 200
+        trades = res_trades.json()
+        assert isinstance(trades, list)
+
+        # 2. 人机收益 PK 曲线数据
+        res_curve = await client.get("/api/trading/equity-history")
+        assert res_curve.status_code == 200
+        curve_data = res_curve.json()
+        assert "points" in curve_data
+        assert "manual_final" in curve_data
+        assert "ai_final" in curve_data
+        assert len(curve_data["points"]) > 0
+
+        # 3. 操盘军规切换
+        res_skills = await client.get("/api/trading/skills")
+        assert res_skills.status_code == 200
+        skills = res_skills.json()
+        if skills:
+            first_skill = skills[0]
+            sid = first_skill["id"]
+            curr_act = first_skill["is_active"]
+
+            res_toggle = await client.post("/api/trading/skills/toggle", json={"skill_id": sid, "is_active": not curr_act})
+            assert res_toggle.status_code == 200
+            assert res_toggle.json()["success"] is True
+
+            # 恢复原状
+            await client.post("/api/trading/skills/toggle", json={"skill_id": sid, "is_active": curr_act})

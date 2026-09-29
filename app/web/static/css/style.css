@@ -846,6 +846,276 @@ body {
   line-height: 1.5;
 }
 
+/* ========================================================
+   操盘工作台 4 大二级选项卡 (持仓/流水/PK曲线/操盘军规)
+   ======================================================== */
+.trade-subtabs-nav {
+  display: flex;
+  gap: 6px;
+  margin-top: 14px;
+  margin-bottom: 8px;
+  background: rgba(15, 23, 42, 0.7);
+  padding: 4px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  overflow-x: auto;
+}
+
+.trade-subtab-btn {
+  flex: 1;
+  min-width: 72px;
+  padding: 8px 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+  text-align: center;
+}
+
+.trade-subtab-btn.active {
+  background: var(--bg-card);
+  color: #F8FAFC;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.trade-subpanel {
+  display: none;
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+.trade-subpanel.active {
+  display: block;
+}
+
+/* 成交流水卡片 */
+.trades-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.trade-record-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.trade-record-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.trade-badge {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.trade-badge-buy {
+  background: rgba(239, 68, 68, 0.15);
+  color: #EF4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.trade-badge-sell {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10B981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.trade-stock-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #F8FAFC;
+}
+
+.trade-time {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.trade-record-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 8px;
+  background: rgba(15, 23, 42, 0.4);
+  border-radius: 6px;
+}
+
+.trade-grid-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.trade-grid-label {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.trade-grid-val {
+  font-size: 12px;
+  font-weight: 600;
+  color: #E2E8F0;
+  font-family: monospace;
+}
+
+.trade-reason-box {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 6px 8px;
+  border-radius: 4px;
+  border-left: 2px solid #38BDF8;
+}
+
+/* 收益曲线图表卡片 */
+.pk-chart-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.pk-chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.pk-stat-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+.pill-manual {
+  background: rgba(56, 189, 248, 0.1);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+}
+
+.pill-ai {
+  background: rgba(168, 85, 247, 0.1);
+  border: 1px solid rgba(168, 85, 247, 0.25);
+}
+
+.dot-manual {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #38BDF8;
+}
+
+.dot-ai {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #A855F7;
+}
+
+.pill-val {
+  font-weight: 800;
+  font-family: monospace;
+}
+
+.pk-alpha-badge {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.pk-canvas-wrapper {
+  width: 100%;
+  height: 220px;
+  position: relative;
+}
+
+#pk-curve-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.pk-chart-footer {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* 操盘军规知识库统计与卡片 */
+.skills-meta-banner {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.skills-stat-item {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 8px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.skills-stat-item .stat-num {
+  font-size: 16px;
+  font-weight: 800;
+  font-family: monospace;
+}
+
+.skills-stat-item .stat-lbl {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.skill-toggle-btn {
+  border: none;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.skill-toggle-active {
+  background: #10B981;
+  color: #FFFFFF;
+}
+
+.skill-toggle-inactive {
+  background: #475569;
+  color: #94A3B8;
+}
+
+.skill-card-inactive {
+  opacity: 0.6;
+  border-style: dashed;
+}
+
 /* AI 自动建仓报告单条卡片 */
 .auto-bought-card {
   background: var(--bg-card);

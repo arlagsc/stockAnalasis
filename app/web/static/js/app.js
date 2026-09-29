@@ -659,6 +659,9 @@ function switchTradeAccount(accountType) {
 
   // 重新加载数据
   loadTradingData();
+  if (currentTradeSubTab === 'trades') {
+    loadTradingTrades();
+  }
   if (isAI) {
     loadSchedulerStatus();
   }
@@ -747,48 +750,399 @@ async function loadTradingData() {
       }
     }
 
-    // 5. 渲染 AI 实战反思操盘军规经验库
-    loadTradingSkills();
+    // 5. 联动刷新当前激活的二级选项卡
+    if (currentTradeSubTab === 'trades') {
+      loadTradingTrades();
+    } else if (currentTradeSubTab === 'pk') {
+      loadPkCurveData();
+    } else if (currentTradeSubTab === 'skills') {
+      loadFullTradingSkills();
+    }
 
   } catch (err) {
     console.error('加载操盘交易数据失败', err);
   }
 }
 
-// 加载 AI 操盘实战军规知识库
-async function loadTradingSkills() {
-  const container = document.getElementById('skills-container');
+// 操盘工作台 4 大核心二级选项卡切换
+let currentTradeSubTab = 'positions';
+
+function switchTradeSubTab(tabName) {
+  currentTradeSubTab = tabName;
+  const tabs = ['positions', 'trades', 'pk', 'skills'];
+
+  tabs.forEach(t => {
+    const btn = document.getElementById(`subtab-btn-${t}`);
+    const panel = document.getElementById(`panel-trade-${t}`);
+    const isActive = (t === tabName);
+
+    if (btn) btn.classList.toggle('active', isActive);
+    if (panel) {
+      panel.style.display = isActive ? 'block' : 'none';
+      panel.classList.toggle('active', isActive);
+    }
+  });
+
+  if (tabName === 'positions') {
+    loadTradingData();
+  } else if (tabName === 'trades') {
+    loadTradingTrades();
+  } else if (tabName === 'pk') {
+    loadPkCurveData();
+  } else if (tabName === 'skills') {
+    loadFullTradingSkills();
+  }
+}
+
+// 1. 加载历史成交流水
+async function loadTradingTrades() {
+  const container = document.getElementById('trades-container');
   if (!container) return;
 
-  try {
-    const res = await fetch('/api/trading/skills');
-    if (!res.ok) return;
-    const skills = await res.json();
+  const currentAcc = state.currentTradeAccount || 'MANUAL';
+  const tradesTitle = document.getElementById('trades-title');
+  if (tradesTitle) {
+    tradesTitle.textContent = currentAcc === 'AI' ? '🤖 AI 账户历史成交流水' : '👤 人类账户历史成交流水';
+  }
 
-    if (!skills || skills.length === 0) {
-      container.innerHTML = '<div class="empty-state">尚未沉淀实战反思军规，平仓交易后将自动提炼</div>';
+  container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 12px;">正在拉取历史成交流水...</div>';
+
+  try {
+    const res = await fetch(`/api/trading/trades?account_type=${currentAcc}&limit=50`);
+    if (!res.ok) {
+      container.innerHTML = '<div class="empty-state">获取成交流水失败</div>';
+      return;
+    }
+    const trades = await res.json();
+
+    if (!trades || trades.length === 0) {
+      container.innerHTML = `<div class="empty-state">${currentAcc === 'AI' ? 'AI 账户尚无任何历史成交流水' : '人类操盘账户暂无历史成交流水'}</div>`;
       return;
     }
 
+    container.innerHTML = trades.map(t => {
+      const isBuy = t.action === 'BUY';
+      const badgeCls = isBuy ? 'trade-badge-buy' : 'trade-badge-sell';
+      const actionText = isBuy ? '买入建仓' : '卖出平仓';
+      const tradeTime = t.trade_time || '';
+      const priceStr = formatPrice(t.price);
+      const totalStr = formatPrice(t.total_value);
+      const fee = Number(t.commission_fee || 0) + Number(t.tax_fee || 0);
+
+      let pnlHtml = '';
+      if (!isBuy) {
+        const pnl = Number(t.realized_pnl || 0);
+        const pnlPct = Number(t.realized_pct || 0);
+        const pnlColor = getChangeClass(pnl);
+        pnlHtml = `
+          <div class="trade-grid-item">
+            <span class="trade-grid-label">实现盈亏</span>
+            <span class="trade-grid-val ${pnlColor}">${pnl > 0 ? '+' : ''}${formatPrice(pnl)} (${pnlPct > 0 ? '+' : ''}${pnlPct.toFixed(2)}%)</span>
+          </div>
+        `;
+      }
+
+      return `
+        <div class="trade-record-card">
+          <div class="trade-record-top">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="trade-badge ${badgeCls}">${actionText}</span>
+              <span class="trade-stock-title">${t.name || t.symbol} (${t.symbol})</span>
+            </div>
+            <span class="trade-time">${tradeTime}</span>
+          </div>
+          <div class="trade-record-grid">
+            <div class="trade-grid-item">
+              <span class="trade-grid-label">成交单价</span>
+              <span class="trade-grid-val">${priceStr} 元</span>
+            </div>
+            <div class="trade-grid-item">
+              <span class="trade-grid-label">成交数量</span>
+              <span class="trade-grid-val">${t.amount} 股</span>
+            </div>
+            <div class="trade-grid-item">
+              <span class="trade-grid-label">成交总金额</span>
+              <span class="trade-grid-val">${totalStr} 元</span>
+            </div>
+            <div class="trade-grid-item">
+              <span class="trade-grid-label">规费/佣金</span>
+              <span class="trade-grid-val">${fee.toFixed(2)} 元</span>
+            </div>
+            ${pnlHtml}
+          </div>
+          ${t.reason ? `<div class="trade-reason-box">💡 决策理由: ${t.reason}</div>` : ''}
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    console.error('拉取成交流水异常', err);
+    container.innerHTML = '<div class="empty-state">网络异常，无法加载流水</div>';
+  }
+}
+
+// 2. 加载人机收益 PK 曲线数据并渲染 Canvas
+async function loadPkCurveData() {
+  try {
+    const res = await fetch('/api/trading/equity-history');
+    if (!res.ok) return;
+    const data = await res.json();
+
+    const mRet = Number(data.manual_final || 0);
+    const aiRet = Number(data.ai_final || 0);
+    const alpha = Number(data.alpha || 0);
+
+    const mEl = document.getElementById('pk-chart-manual-ret');
+    const aiEl = document.getElementById('pk-chart-ai-ret');
+    const alphaEl = document.getElementById('pk-chart-alpha-val');
+
+    if (mEl) {
+      mEl.textContent = `${mRet > 0 ? '+' : ''}${mRet.toFixed(2)}%`;
+      mEl.className = `pill-val ${getChangeClass(mRet)}`;
+    }
+    if (aiEl) {
+      aiEl.textContent = `${aiRet > 0 ? '+' : ''}${aiRet.toFixed(2)}%`;
+      aiEl.className = `pill-val ${getChangeClass(aiRet)}`;
+    }
+    if (alphaEl) {
+      alphaEl.textContent = `${alpha > 0 ? '+' : ''}${alpha.toFixed(2)}%`;
+      alphaEl.className = `${getChangeClass(alpha)}`;
+    }
+
+    renderPkCurveChart(data.points || []);
+  } catch (err) {
+    console.error('加载收益曲线异常', err);
+  }
+}
+
+// Canvas 渲染双轨平滑收益曲线图
+function renderPkCurveChart(points) {
+  const canvas = document.getElementById('pk-curve-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+
+  const dpr = window.devicePixelRatio || 2;
+  const rect = canvas.getBoundingClientRect();
+  const width = rect.width || 340;
+  const height = 220;
+
+  canvas.width = width * dpr;
+  canvas.height = height * dpr;
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, width, height);
+
+  if (!points || points.length === 0) {
+    ctx.fillStyle = '#64748B';
+    ctx.font = '12px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('暂无收益走势曲线数据', width / 2, height / 2);
+    return;
+  }
+
+  // 计算极值，包含 0 轴
+  let minVal = 0;
+  let maxVal = 0;
+  points.forEach(p => {
+    minVal = Math.min(minVal, p.manual, p.ai);
+    maxVal = Math.max(maxVal, p.manual, p.ai);
+  });
+
+  const margin = Math.max(0.4, (maxVal - minVal) * 0.15);
+  minVal -= margin;
+  maxVal += margin;
+  const range = (maxVal - minVal) || 1;
+
+  const padding = { top: 20, bottom: 26, left: 16, right: 48 };
+  const plotW = width - padding.left - padding.right;
+  const plotH = height - padding.top - padding.bottom;
+
+  function getX(index) {
+    return padding.left + (index / (points.length - 1)) * plotW;
+  }
+
+  function getY(val) {
+    return padding.top + plotH - ((val - minVal) / range) * plotH;
+  }
+
+  // 1. 绘制水平网格与刻度
+  const gridSteps = 4;
+  ctx.strokeStyle = 'rgba(30, 41, 59, 0.7)';
+  ctx.lineWidth = 1;
+  ctx.fillStyle = '#64748B';
+  ctx.font = '10px monospace';
+  ctx.textAlign = 'left';
+
+  for (let i = 0; i <= gridSteps; i++) {
+    const v = minVal + (range / gridSteps) * i;
+    const y = getY(v);
+    ctx.beginPath();
+    ctx.moveTo(padding.left, y);
+    ctx.lineTo(width - padding.right, y);
+    ctx.stroke();
+    ctx.fillText(`${v > 0 ? '+' : ''}${v.toFixed(1)}%`, width - padding.right + 4, y + 3);
+  }
+
+  // 2. 绘制 0 轴基准线 (如果 0 在视口内)
+  if (minVal <= 0 && maxVal >= 0) {
+    const y0 = getY(0);
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(148, 163, 184, 0.4)';
+    ctx.lineWidth = 1.2;
+    ctx.setLineDash([4, 4]);
+    ctx.moveTo(padding.left, y0);
+    ctx.lineTo(width - padding.right, y0);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // 3. 辅助绘制曲线与渐变区域函数
+  function drawCurve(dataKey, strokeColor, fillColor) {
+    const grad = ctx.createLinearGradient(0, padding.top, 0, padding.top + plotH);
+    grad.addColorStop(0, fillColor);
+    grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+    ctx.beginPath();
+    points.forEach((p, idx) => {
+      const x = getX(idx);
+      const y = getY(p[dataKey]);
+      if (idx === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+
+    const lastX = getX(points.length - 1);
+    const firstX = getX(0);
+    const bottomY = padding.top + plotH;
+    ctx.lineTo(lastX, bottomY);
+    ctx.lineTo(firstX, bottomY);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    ctx.beginPath();
+    points.forEach((p, idx) => {
+      const x = getX(idx);
+      const y = getY(p[dataKey]);
+      if (idx === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = 2.2;
+    ctx.stroke();
+
+    const endX = getX(points.length - 1);
+    const endY = getY(points[points.length - 1][dataKey]);
+    ctx.beginPath();
+    ctx.arc(endX, endY, 4, 0, Math.PI * 2);
+    ctx.fillStyle = strokeColor;
+    ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = '#0F172A';
+    ctx.stroke();
+  }
+
+  // 绘制人类主观收益曲线 (青色)
+  drawCurve('manual', '#38BDF8', 'rgba(56, 189, 248, 0.18)');
+
+  // 绘制 AI 智能收益曲线 (紫色)
+  drawCurve('ai', '#A855F7', 'rgba(168, 85, 247, 0.22)');
+
+  // 4. 绘制 X 轴时间标签
+  ctx.fillStyle = '#64748B';
+  ctx.font = '10px sans-serif';
+  ctx.textAlign = 'center';
+  const labelIndices = [0, Math.floor(points.length / 2), points.length - 1];
+  labelIndices.forEach(idx => {
+    if (points[idx]) {
+      const x = getX(idx);
+      ctx.fillText(points[idx].time || '', x, height - 8);
+    }
+  });
+}
+
+// 3. 加载全量沉淀操盘 Skill 知识库
+async function loadFullTradingSkills() {
+  const container = document.getElementById('skills-full-container');
+  if (!container) return;
+
+  container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 12px;">正在读取实战军规知识库...</div>';
+
+  try {
+    const res = await fetch('/api/trading/skills');
+    if (!res.ok) {
+      container.innerHTML = '<div class="empty-state">获取军规知识库失败</div>';
+      return;
+    }
+    const skills = await res.json();
+
+    if (!skills || skills.length === 0) {
+      container.innerHTML = '<div class="empty-state">尚未沉淀实战反思军规，平仓交易后将由 AI 反思自进化沉淀</div>';
+      return;
+    }
+
+    const totalCount = skills.length;
+    const activeCount = skills.filter(s => s.is_active).length;
+    const avgScore = (skills.reduce((acc, s) => acc + Number(s.win_rate_score || 80), 0) / totalCount).toFixed(1);
+
+    const totalEl = document.getElementById('skills-total-count');
+    const activeEl = document.getElementById('skills-active-count');
+    const avgEl = document.getElementById('skills-avg-score');
+
+    if (totalEl) totalEl.textContent = totalCount;
+    if (activeEl) activeEl.textContent = activeCount;
+    if (avgEl) avgEl.textContent = avgScore;
+
     container.innerHTML = skills.map(s => {
       const score = Number(s.win_rate_score || 75).toFixed(1);
+      const isActive = !!s.is_active;
+      const cardCls = isActive ? 'skill-card' : 'skill-card skill-card-inactive';
+      const toggleCls = isActive ? 'skill-toggle-active' : 'skill-toggle-inactive';
+      const toggleText = isActive ? '已激活' : '已停用';
+
       return `
-        <div class="skill-card">
+        <div class="${cardCls}">
           <div class="skill-header">
             <div class="skill-title-row">
               <span class="skill-category">${s.category || '综合战法'}</span>
               <span class="skill-title">${s.rule_title}</span>
             </div>
-            <span class="skill-score">置信 ${score} 分</span>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span class="skill-score">置信 ${score} 分</span>
+              <button class="skill-toggle-btn ${toggleCls}" onclick="toggleSkillActive(${s.id}, ${isActive})">${toggleText}</button>
+            </div>
           </div>
           <div class="skill-body">${s.rule_markdown}</div>
+          <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 10px; color: var(--text-muted);">
+            <span>归因源标的: <b style="color:#94A3B8;">${s.from_symbol || '--'}</b></span>
+            <span>沉淀时间: ${s.created_at || '--'}</span>
+          </div>
         </div>
       `;
     }).join('');
   } catch (err) {
-    console.warn('加载操盘技能库失败', err);
+    console.error('加载操盘知识库失败', err);
+    container.innerHTML = '<div class="empty-state">网络异常，无法加载军规知识库</div>';
   }
 }
+
+// 切换操盘军规激活状态
+async function toggleSkillActive(skillId, currentStatus) {
+  try {
+    const res = await fetch('/api/trading/skills/toggle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ skill_id: skillId, is_active: !currentStatus })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(`操盘军规状态已切换为: ${!currentStatus ? '已激活' : '已停用'}`);
+      loadFullTradingSkills();
+    } else {
+      alert(`切换军规状态失败: ${data.error || '未知错误'}`);
+    }
+  } catch (err) {
+    alert(`网络请求异常: ${err.message}`);
+  }
+}
+
 
 // 触发 AI 一键自动建仓
 async function triggerAutoTrade() {

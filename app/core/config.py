@@ -6,6 +6,8 @@
 """
 
 import os
+import sys
+import shutil
 import logging
 from pathlib import Path
 from typing import Dict, Any, List
@@ -40,9 +42,23 @@ class AppConfig:
             cls._instance.load_settings()
         return cls._instance
 
+    def _get_app_base_dir(self) -> Path:
+        """获取应用程序基准运行目录
+        
+        - 运行打包可执行程序 (Frozen exe) 时：返回 exe 文件所在目录
+        - 源码开发环境下：返回工程根目录
+        """
+        if getattr(sys, "frozen", False):
+            return Path(sys.executable).resolve().parent
+        else:
+            return Path(__file__).resolve().parent.parent.parent
+
     def _init_paths(self):
         """初始化跨平台路径，自动建立所需目录"""
-        # 数据根目录
+        # 应用程序基准根目录 (源码根目录 或 exe 所在目录)
+        self.app_base_dir = self._get_app_base_dir()
+
+        # 数据根目录 (保留标准用户目录作为通用缓存与备用)
         self.data_dir = Path(user_data_dir(appname=APP_NAME, appauthor=APP_AUTHOR))
         self.data_dir.mkdir(parents=True, exist_ok=True)
 
@@ -54,8 +70,20 @@ class AppConfig:
         self.log_dir = Path(user_log_dir(appname=APP_NAME, appauthor=APP_AUTHOR))
         self.log_dir.mkdir(parents=True, exist_ok=True)
 
-        # 数据库与配置文件路径
-        self.db_path = self.data_dir / "stock_ai.db"
+        # 数据库路径：开发环境链接到项目根目录，打包运行时链接到 exe 文件所在目录
+        self.db_path = self.app_base_dir / "stock_ai.db"
+
+        # 若在打包 exe 运行环境中且 exe 同级目录尚无数据库文件，尝试从打包资源目录中自动释放预置库
+        if getattr(sys, "frozen", False) and not self.db_path.exists():
+            bundle_dir = Path(getattr(sys, "_MEIPASS", self.app_base_dir))
+            bundled_db = bundle_dir / "stock_ai.db"
+            if bundled_db.exists():
+                try:
+                    shutil.copy2(bundled_db, self.db_path)
+                except Exception:
+                    pass
+
+        # 配置文件与日志文件路径
         self.config_json_path = self.data_dir / "settings.json"
         self.log_file_path = self.log_dir / "stock_ai.log"
 

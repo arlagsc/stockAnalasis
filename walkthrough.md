@@ -501,5 +501,76 @@ graph TD
     2. 在缺少名称或名称为占位符时，不论是否传入 `custom_price` 均通过定向盘口接口或基础数据源补充真实中文简称；
     3. 在 `refresh_positions_quotes()` 批量刷新盘口时，增加对存量占位名称的自动修正逻辑；
     4. 存量持仓与成交流水已全量刷新为规范中文名称（唯科科技、腾景科技）。
+- **2026-09-28 [数据库项目根目录迁移、便携式路径解析与打包 exe 动态链接适配]**：
+  - **业务诉求与架构演进**：
+    - 将原存储于操作系统用户目录（`%LOCALAPPDATA%/StockAI_Team/StockAI/stock_ai.db`）的 SQLite 数据库迁移至当前项目根目录 [`stock_ai.db`](file:///d:/AI/stockAnalasis/stock_ai.db)，便于工程级直接访问与版本化维护；
+    - 在运行打包后的 exe 程序时，数据库自动动态定位并链接到 exe 文件所在同级目录，实现绿色免安装、数据随目录便携移动的独立操盘软件形态。
+  - **核心实现与路径动态适配**：
+    1. **数据全量迁移与校验**：已从 AppData 用户目录完整拷贝包含 5,565 支 A 股基础行情、指标快照与当前虚拟操盘持仓、成交流水的真实数据库至工程根目录，并经 SQLite 原生驱动与 SQLAlchemy ORM 双重完整性校验；
+    2. **双轨路径解析中枢 ([`app/core/config.py`](file:///d:/AI/stockAnalasis/app/core/config.py))**：
+       - 实现 `_get_app_base_dir()`：根据 `getattr(sys, "frozen", False)` 动态裁决，打包 exe 运行时返回 `Path(sys.executable).resolve().parent`，源码开发调试时返回工程根目录 `PROJECT_ROOT`；
+       - `self.db_path` 统一绑定为 `self.app_base_dir / "stock_ai.db"`；
+       - 内置打包资源自解压保护：在 exe 首次运行时，若当前目录尚未生成数据库，自动从打包资源包（`sys._MEIPASS`）中无损释放初始数据库到 exe 同级目录；
+    3. **PyInstaller 资源打包更新 ([`stock_ai.spec`](file:///d:/AI/stockAnalasis/stock_ai.spec))**：在 `datas` 收集列表中将根目录 `stock_ai.db` 纳入分发打包包体，支持 Windows 与 macOS 一键构建便携分发产物；
+    4. **自动化单元测试验证 ([`tests/test_db_path.py`](file:///d:/AI/stockAnalasis/tests/test_db_path.py))**：覆盖源码开发环境路径匹配与 `sys.frozen` 模拟 exe 环境路径解析，9 项 Web API 测试与路径单元测试 100% 通过。
+- **2026-09-28 [Web/浏览器端自动操盘功能对齐：补齐历史成交流水、收益 PK 曲线与操盘军规知识库]**：
+  - **业务诉求与功能差距分析**：
+    - 桌面端具备完整的“当前持仓、成交流水、收益 PK 曲线、Skill 知识库”四大工作台选项卡，而此前移动端/浏览器端仅有单一的持仓列表与简单的技能展示，缺少成交流水追溯、双轨净值曲线对比以及军规启停控制功能。
+  - **后端 API 架构补齐 ([`app/web/api.py`](file:///d:/AI/stockAnalasis/app/web/api.py))**：
+    1. 新增 `GET /api/trading/trades`：支持按操盘账户（MANUAL / AI）分页拉取历史成交流水，字段涵盖动作类型、成交均价、股数、成交额、印花税佣金、平仓实现盈亏及实战决策归因；
+    2. 新增 `GET /api/trading/equity-history`：提供人机双轨净值与收益率走势时序数据，包含时序采样点、终点对齐收益率与 Alpha 差值指标；
+    3. 新增 `POST /api/trading/skills/toggle`：实现移动端对沉淀操盘军规的一键启停控制，动态同步至底层 SQLite 知识库。
+  - **前端交互与沉浸式 UI 重构 ([`app/web/static/`](file:///d:/AI/stockAnalasis/app/web/static/))**：
+    1. **四级选项卡架构**：在 `index.html` 操盘主页引入 `.trade-subtabs-nav`，支持在【💼 当前持仓】、【📜 成交流水】、【📈 收益曲线】、【🧠 操盘军规】之间丝滑切换；
+    2. **历史成交流水面板**：根据买入/卖出方向呈现红绿徽章，卡片式展示单价、股数、金额、规费及决策理由框，平仓交易醒目高亮实现盈亏；
+    3. **人机收益 PK 曲线图表**：使用 HTML5 Canvas 原生实现高清 Retina 级双轨平滑走势图，人类青色折线（`#38BDF8`）与 AI 紫色折线（`#A855F7`）辅以渐变面积填充、零轴基准线与时序坐标轴；
+    4. **操盘军规知识库专区**：展示军规总数、激活数与平均胜率统计卡片，支持查看战法类别、来源标的与核心 Markdown 策略，并提供一键式交互启停 Switch 开关；
+    5. **跨账户与生命周期联动**：在 `app.js` 中完善 `switchTradeSubTab()`、`loadTradingTrades()`、`renderPkCurveChart()` 与 `toggleSkillActive()`，切换账户或执行交易后自动实时联动更新。
+  - **质量保障与测试覆盖**：
+    - 在 [`tests/test_mobile_api.py`](file:///d:/AI/stockAnalasis/tests/test_mobile_api.py) 中新增 `test_trades_history_and_pk_curve_and_skills_toggle`，10 项自动化集成测试 100% 顺利通过。
+- **2026-09-29 [远程 Windows Server 部署落地：独立服务端运行入口、HTTP Basic 鉴权中间件与 NSSM 系统服务化]**：
+  - **业务诉求与生产架构方案**：
+    - 需将 StockAI 项目部署至远程 Windows Server 服务器（`172.16.9.28`，管理员账号 `mtcs9028\administrator`），并通过外部网络 `http://113.98.232.83:2222` 进行远程监控与操盘；
+    - 针对公网直接暴露的安全性隐患，必须引入高强度安全认证，并实现开机常驻、异常崩溃自动拉起、调度引擎后台自愈的系统服务化形态；
+    - 采用方案一：Git 源码部署 + 虚拟环境（`.venv`）+ 无头独立运行入口（`run_server.py`）+ NSSM（Non-Sucking Service Manager）系统服务生命周期托管。
+  - **部署与鉴权架构流程图**：
+    ```mermaid
+    flowchart TD
+        Client["公网浏览器 / 移动端 PWA (http://113.98.232.83:2222)"] -->|公网流量| Gateway["外部公网映射 IP: 113.98.232.83:2222"]
+        Gateway -->|端口映射转发| Firewall["Windows 防火墙 (允许 TCP 2222 入站)"]
+        Firewall -->|本地监听| FastAPIServer["FastAPI / Uvicorn (0.0.0.0:2222)"]
+        
+        subgraph SafeMiddleware["安全防护层 (app/web/api.py)"]
+            FastAPIServer --> AuthCheck{"Basic 身份鉴权中间件"}
+            AuthCheck -->|未携带或密码错误| Reject["返回 401 Unauthorized (Basic Realm)"]
+            AuthCheck -->|身份比对一致| Allow["放行请求 (静态资源 / RESTful API)"]
+        end
+        
+        subgraph ServiceEngine["系统守护层 (NSSM Windows Service)"]
+            NSSM["NSSM 服务进程 (StockAIService)"] -->|启动与看门狗轮询| Runner["生产环境入口 (run_server.py)"]
+            Runner --> FastAPIServer
+            Runner -->|自动挂载| DaemonScheduler["AI 自主交易调度器 (AutonomousScheduler)"]
+            Runner -->|重定向 stdout/stderr| ServiceLogs["滚动运行日志 (logs/service_stdout.log)"]
+        end
+    ```
+  - **核心模块与编码实现**：
+    1. **HTTP Basic 身份鉴权中间件 ([app/web/api.py](file:///d:/AI/stockAnalasis/app/web/api.py))**：
+       - 基于 Starlette HTTP 中间件机制，通过环境变量 `STOCKAI_ENABLE_AUTH`、`STOCKAI_AUTH_USER`、`STOCKAI_AUTH_PASS` 动态激活；
+       - 放行 OPTIONS 跨域预检请求，拦截未授权访问并输出 `401 Unauthorized` 及标准 `WWW-Authenticate: Basic realm="StockAI Secure Trading"` 头；
+       - 使用 Python 标准库 `secrets.compare_digest` 进行用户名与密码常数时间比对，杜绝时序攻击（Timing Attacks）；
+       - 默认兼容本地免密开发调试模式，仅在生产环境配置鉴权变量时强制生效。
+    2. **生产环境无头服务入口 ([run_server.py](file:///d:/AI/stockAnalasis/run_server.py))**：
+       - 提供专为服务器环境设计的独立 Python 启动入口，彻底摆脱 Qt/GUI 桌面依赖；
+       - 命令行参数支持 `--host`（默认 `0.0.0.0`）、`--port`（默认 `2222`）、`--auth-user`、`--auth-pass`、`--no-auth` 及 `--no-scheduler`；
+       - 启动时自动进行 TCP 端口预检（`check_port_available`），并在占用时输出诊断信息；
+       - 启动成功后自动拉起 `AutonomousScheduler` AI 自主操盘守护引擎；
+       - 捕获 `SIGINT` 与 `SIGTERM` 系统信号，优雅执行调度器安全暂停与 Uvicorn 异步平稳关机。
+    3. **Windows Server 自动化部署与运维脚本 ([deploy_server.ps1](file:///d:/AI/stockAnalasis/deploy_server.ps1))**：
+       - 基于 PowerShell 编写全生命周期服务管理脚本，支持 `install`、`start`、`stop`、`restart`、`status`、`uninstall`、`firewall`、`nssm-download` 操作动作；
+       - `firewall` 动作：调用 `netsh advfirewall firewall add rule` 一键开启入站 TCP 2222 端口；
+       - `nssm-download` 动作：自动从官方源下载 NSSM 压缩包并解压 64 位 `nssm.exe` 至项目 `tools/nssm/` 目录；
+       - `install` 动作：注册 `StockAIService` 系统服务，配置自动开机自启（`SERVICE_AUTO_START`）、崩溃后延时 5 秒自动重启，并配置日志滚动轮转（单文件上限 50 MB，自动轮转输出至 `logs/service_stdout.log` 与 `logs/service_stderr.log`）。
+    4. **自动化单元测试覆盖 ([tests/test_server_auth.py](file:///d:/AI/stockAnalasis/tests/test_server_auth.py))**：
+       - 覆盖未启用鉴权、启用鉴权后无凭证访问（401）、错误凭证访问（401）、正确凭证访问（200）以及 OPTIONS 预检请求放行等全部 5 项测试用例，执行结果 100% 通过。
 
 

@@ -27,6 +27,10 @@ universe_file = os.path.join('app', 'data', 'stocks_universe.json')
 if os.path.exists(universe_file):
     datas.append((universe_file, os.path.join('app', 'data')))
 
+db_file = 'stock_ai.db'
+if os.path.exists(db_file):
+    datas.append((db_file, '.'))
+
 # 2. 收集全量关键库隐式依赖，防止动态加载丢失
 hidden_imports = [
     'PySide6.QtCore',

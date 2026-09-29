@@ -225,23 +225,100 @@
       <div class="ai-action-subtip">节律: 09:35进攻 ｜ 15分钟巡检 ｜ 14:45定型 ｜ 15:30收盘复盘</div>
     </div>
 
-    <!-- 当前持仓明细 -->
-    <div class="section-header" style="margin-top: 14px;">
-      <div id="positions-title" class="section-title">💼 当前持仓明细</div>
-      <button class="btn-icon" onclick="loadTradingData()">刷新价格</button>
-    </div>
-    <div id="positions-container">
-      <!-- 动态持仓卡片 -->
+    <!-- 操盘工作台 4 大核心二级选项卡切换 -->
+    <div class="trade-subtabs-nav">
+      <button id="subtab-btn-positions" class="trade-subtab-btn active" onclick="switchTradeSubTab('positions')">
+        💼 当前持仓
+      </button>
+      <button id="subtab-btn-trades" class="trade-subtab-btn" onclick="switchTradeSubTab('trades')">
+        📜 成交流水
+      </button>
+      <button id="subtab-btn-pk" class="trade-subtab-btn" onclick="switchTradeSubTab('pk')">
+        📈 收益曲线
+      </button>
+      <button id="subtab-btn-skills" class="trade-subtab-btn" onclick="switchTradeSubTab('skills')">
+        🧠 操盘军规
+      </button>
     </div>
 
-    <!-- AI 操盘军规技能库 (实战反思沉淀) -->
-    <div id="ai-skills-section" class="ai-skills-section" style="margin-top: 20px;">
-      <div class="section-header">
-        <div class="section-title">🧠 AI 操盘军规经验库</div>
-        <span style="font-size: 11px; color: var(--accent-purple);">实盘反思沉淀</span>
+    <!-- 子面板 1: 当前持仓明细 -->
+    <div id="panel-trade-positions" class="trade-subpanel active">
+      <div class="section-header" style="margin-top: 10px;">
+        <div id="positions-title" class="section-title">💼 当前持仓明细</div>
+        <button class="btn-icon" onclick="loadTradingData()">刷新价格</button>
       </div>
-      <div id="skills-container" class="skills-container">
-        <!-- 动态加载军规卡片 -->
+      <div id="positions-container">
+        <!-- 动态持仓卡片 -->
+      </div>
+    </div>
+
+    <!-- 子面板 2: 历史成交流水 -->
+    <div id="panel-trade-trades" class="trade-subpanel" style="display: none;">
+      <div class="section-header" style="margin-top: 10px;">
+        <div id="trades-title" class="section-title">📜 历史成交流水</div>
+        <button class="btn-icon" onclick="loadTradingTrades()">刷新流水</button>
+      </div>
+      <div id="trades-container" class="trades-container">
+        <!-- 动态成交流水卡片 -->
+      </div>
+    </div>
+
+    <!-- 子面板 3: 人机收益 PK 曲线 -->
+    <div id="panel-trade-pk" class="trade-subpanel" style="display: none;">
+      <div class="section-header" style="margin-top: 10px;">
+        <div class="section-title">📈 人机双轨收益率走势对比</div>
+        <button class="btn-icon" onclick="loadPkCurveData()">刷新走势</button>
+      </div>
+      <div class="pk-chart-card">
+        <!-- 核心收益对比板 -->
+        <div class="pk-chart-header">
+          <div class="pk-stat-pill pill-manual">
+            <span class="pill-dot dot-manual"></span>
+            <span class="pill-name">人类主观</span>
+            <span id="pk-chart-manual-ret" class="pill-val">--%</span>
+          </div>
+          <div class="pk-alpha-badge">
+            Alpha 差值: <span id="pk-chart-alpha-val">--%</span>
+          </div>
+          <div class="pk-stat-pill pill-ai">
+            <span class="pill-dot dot-ai"></span>
+            <span class="pill-name">AI 智能</span>
+            <span id="pk-chart-ai-ret" class="pill-val">--%</span>
+          </div>
+        </div>
+        <!-- Canvas 曲线绘制区 -->
+        <div class="pk-canvas-wrapper">
+          <canvas id="pk-curve-canvas"></canvas>
+        </div>
+        <div class="pk-chart-footer">
+          <span>横轴: 交易时序节点 (09:30~当前)</span>
+          <span>纵轴: 累计收益率 (%)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 子面板 4: 沉淀操盘 Skill 知识库 -->
+    <div id="panel-trade-skills" class="trade-subpanel" style="display: none;">
+      <div class="section-header" style="margin-top: 10px;">
+        <div class="section-title">🧠 操盘军规经验知识库</div>
+        <button class="btn-icon" onclick="loadFullTradingSkills()">刷新军规</button>
+      </div>
+      <div class="skills-meta-banner">
+        <div class="skills-stat-item">
+          <span class="stat-num" id="skills-total-count">0</span>
+          <span class="stat-lbl">沉淀军规总数</span>
+        </div>
+        <div class="skills-stat-item">
+          <span class="stat-num" id="skills-active-count" style="color: var(--accent-cyan);">0</span>
+          <span class="stat-lbl">生效注入中</span>
+        </div>
+        <div class="skills-stat-item">
+          <span class="stat-num" id="skills-avg-score" style="color: var(--accent-gold);">0.0</span>
+          <span class="stat-lbl">平均置信胜率</span>
+        </div>
+      </div>
+      <div id="skills-full-container" class="skills-container" style="margin-top: 10px;">
+        <!-- 动态加载完整军规卡片（含分类、来源标的、Markdown内容、启停开关） -->
       </div>
     </div>
 
