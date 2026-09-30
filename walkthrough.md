@@ -573,5 +573,10 @@ graph TD
        - 双模容灾降级：当服务器处于内网隔离环境或海外官方 NSSM 源下载超时时，脚本自动平滑降级为 Windows 系统内置 `schtasks` 原生计划任务模式，彻底消除对外部网络下载的强依赖。
     4. **自动化单元测试覆盖 ([tests/test_server_auth.py](file:///d:/AI/stockAnalasis/tests/test_server_auth.py))**：
        - 覆盖未启用鉴权、启用鉴权后无凭证访问（401）、错误凭证访问（401）、正确凭证访问（200）以及 OPTIONS 预检请求放行等全部 5 项测试用例，执行结果 100% 通过。
+    5. **方案 B 生产落地与多服务共存反向代理实施**：
+       - 目标服务器 `172.16.9.28` 上的 2222 端口承载生产级 `HaiGuanFTP_Browser` 目录浏览服务；
+       - 通过 SSH 自动化远程安装微软官方 `RewriteModule`（URL Rewrite 2.1）与 `ApplicationRequestRouting`（ARR 3.0）并激活反向代理；
+       - 在 `D:\HaiGuanFTP\web.config` 中配置精准路由转发规则：保留 `/` 根路径与原有 txt/specs 文件正常目录浏览与下载，将 `/stock` 与 `/api/*`、`/css/*`、`/js/*` 无损反向代理至后台监听在 `127.0.0.1:8000` 的 StockAI 核心服务；
+       - 完成多端点自动化联调，内网与公网 `http://113.98.232.83:2222/`（原业务）与 `http://113.98.232.83:2222/stock`（StockAI 操盘终端）双轨并行验证 100% 成功。
 
 
