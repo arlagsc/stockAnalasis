@@ -569,7 +569,8 @@ graph TD
        - 基于 PowerShell 编写全生命周期服务管理脚本，支持 `install`、`start`、`stop`、`restart`、`status`、`uninstall`、`firewall`、`nssm-download` 操作动作；
        - `firewall` 动作：调用 `netsh advfirewall firewall add rule` 一键开启入站 TCP 2222 端口；
        - `nssm-download` 动作：自动从官方源下载 NSSM 压缩包并解压 64 位 `nssm.exe` 至项目 `tools/nssm/` 目录；
-       - `install` 动作：注册 `StockAIService` 系统服务，配置自动开机自启（`SERVICE_AUTO_START`）、崩溃后延时 5 秒自动重启，并配置日志滚动轮转（单文件上限 50 MB，自动轮转输出至 `logs/service_stdout.log` 与 `logs/service_stderr.log`）。
+       - `install` 动作：注册 `StockAIService` 系统服务，支持 NSSM 与 Windows 原生计划任务（`schtasks`）双模自适应切换，配置开机自启（`SERVICE_AUTO_START` / `/SC ONSTART`）、崩溃自动重启，并配置日志滚动轮转；
+       - 双模容灾降级：当服务器处于内网隔离环境或海外官方 NSSM 源下载超时时，脚本自动平滑降级为 Windows 系统内置 `schtasks` 原生计划任务模式，彻底消除对外部网络下载的强依赖。
     4. **自动化单元测试覆盖 ([tests/test_server_auth.py](file:///d:/AI/stockAnalasis/tests/test_server_auth.py))**：
        - 覆盖未启用鉴权、启用鉴权后无凭证访问（401）、错误凭证访问（401）、正确凭证访问（200）以及 OPTIONS 预检请求放行等全部 5 项测试用例，执行结果 100% 通过。
 
