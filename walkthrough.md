@@ -595,5 +595,11 @@ graph TD
     4. **前端大盘定时自动轮询与手动全量同步接口 ([app/web/static/js/app.js](file:///d:/AI/stockAnalasis/app/web/static/js/app.js), [app/web/api.py](file:///d:/AI/stockAnalasis/app/web/api.py))**：
        - 前端加入 15 秒静默轮询机制；
        - 新增 `POST /api/market/sync` 接口支持即时全量同步。
+- **2026-10-08 [Git 远程代码库双主分支同步与全量推送]**：
+  - **背景与操作说明**：
+    - 此前所有服务器化部署、IIS 反向代理、移动端 PWA 与实时行情修复代码均提交并推送至 `master` 分支；
+    - 针对 GitHub 默认主分支规范与远程多分支一致性诉求，将 `master` 分支最新提交（`3fc9a55`）以 Fast-forward（快进）方式无损合并至本地 `main` 分支，并全量推送到远程 `origin/main` 与 `origin/master`；
+    - 确保在 GitHub 远程仓库无论检视 `main` 还是 `master` 分支，均保持 100% 同步的最新生产态代码。
+
 
 
