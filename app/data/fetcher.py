@@ -138,18 +138,21 @@ class DataFetcher:
         """
         import urllib.request
 
-        cleaned_symbols = [str(s).strip().zfill(6) for s in symbols if s]
-        if not cleaned_symbols:
+        if not symbols:
             return {}
 
         def get_full_symbol(sym: str) -> str:
-            if sym.startswith(("60", "68")):
-                return f"sh{sym}"
-            elif sym.startswith(("00", "30")):
-                return f"sz{sym}"
-            elif sym.startswith(("43", "83", "87", "92")):
-                return f"bj{sym}"
-            return f"sz{sym}"
+            s_str = str(sym).strip().lower()
+            if s_str.startswith(("sh", "sz", "bj")):
+                return s_str
+            digits = s_str.zfill(6)
+            if digits.startswith(("60", "68")):
+                return f"sh{digits}"
+            elif digits.startswith(("00", "30")):
+                return f"sz{digits}"
+            elif digits.startswith(("43", "83", "87", "92")):
+                return f"bj{digits}"
+            return f"sz{digits}"
 
         def safe_float(val: Any) -> float:
             try:
@@ -159,7 +162,11 @@ class DataFetcher:
             except Exception:
                 return 0.0
 
-        query = ",".join(get_full_symbol(c) for c in cleaned_symbols)
+        query_symbols = [get_full_symbol(s) for s in symbols if s]
+        if not query_symbols:
+            return {}
+
+        query = ",".join(query_symbols)
         url = f"https://qt.gtimg.cn/q={query}"
         req = urllib.request.Request(
             url,
@@ -168,13 +175,15 @@ class DataFetcher:
 
         result_map: Dict[str, Dict[str, Any]] = {}
         try:
-            with urllib.request.urlopen(req, timeout=4) as resp:
+            with urllib.request.urlopen(req, timeout=5) as resp:
                 text = resp.read().decode("gbk", errors="ignore")
                 for line in text.split(";"):
                     line = line.strip()
                     if not line or "=" not in line:
                         continue
-                    val_str = line.split("=", 1)[1].strip('"')
+                    prefix_part, val_str = line.split("=", 1)
+                    val_str = val_str.strip('"')
+                    full_code = prefix_part.replace("v_", "").strip().lower()
                     parts = val_str.split("~")
                     if len(parts) > 40:
                         s_code = parts[2].zfill(6)
@@ -184,14 +193,18 @@ class DataFetcher:
                         vol = safe_float(parts[6]) if len(parts) > 6 else 0.0
                         mkt_val = safe_float(parts[45]) if len(parts) > 45 else 0.0
 
-                        result_map[s_code] = {
+                        quote_item = {
                             "symbol": s_code,
+                            "full_code": full_code,
                             "name": s_name,
                             "close_price": price,
                             "change_pct": chg,
                             "volume": vol,
                             "total_market_val": mkt_val,
                         }
+                        result_map[s_code] = quote_item
+                        if full_code:
+                            result_map[full_code] = quote_item
             logger.info("定向高速通道已成功获取 %d 支标的实时盘口", len(result_map))
         except Exception as e:
             logger.warning("定向拉取盘口异常: %s", str(e))

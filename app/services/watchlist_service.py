@@ -82,17 +82,38 @@ class WatchlistService:
         finally:
             session.close()
 
-        # 合并全景行情数据
+        # 毫秒级拉取自选股最新实时盘口
+        realtime_map = {}
+        try:
+            realtime_map = data_fetcher.fetch_specific_quotes(symbols)
+        except Exception as e:
+            logger.warning("自选股拉取实时盘口异常，降级使用基础库数据: %s", e)
+
+        # 合并全景基础数据
         universe = data_service.get_stock_universe()
-        results = []
+        universe_map = {}
         if not universe.empty and "symbol" in universe.columns:
-            matched = universe[universe["symbol"].isin(symbols)]
-            for _, row in matched.iterrows():
-                sym = row["symbol"]
-                d = row.to_dict()
-                d["group_name"] = meta_map.get(sym, {}).get("group", "默认自选")
-                d["notes"] = meta_map.get(sym, {}).get("notes", "")
-                results.append(d)
+            for _, row in universe.iterrows():
+                universe_map[str(row["symbol"]).zfill(6)] = row.to_dict()
+
+        results = []
+        for sym in symbols:
+            base_info = universe_map.get(sym, {"symbol": sym, "name": f"标的{sym}"})
+            d = dict(base_info)
+            # 若有实时盘口，优先更新最新成交价、涨跌幅、成交量与股票名称
+            if sym in realtime_map:
+                rt = realtime_map[sym]
+                if rt.get("close_price") is not None and rt.get("close_price") > 0:
+                    d["close_price"] = rt["close_price"]
+                if "change_pct" in rt:
+                    d["change_pct"] = rt["change_pct"]
+                if rt.get("name") and not d.get("name"):
+                    d["name"] = rt["name"]
+                if rt.get("volume"):
+                    d["volume"] = rt["volume"]
+            d["group_name"] = meta_map.get(sym, {}).get("group", "默认自选")
+            d["notes"] = meta_map.get(sym, {}).get("notes", "")
+            results.append(d)
         return results
 
     def get_all_groups(self) -> List[str]:

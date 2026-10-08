@@ -578,5 +578,22 @@ graph TD
        - 通过 SSH 自动化远程安装微软官方 `RewriteModule`（URL Rewrite 2.1）与 `ApplicationRequestRouting`（ARR 3.0）并激活反向代理；
        - 在 `D:\HaiGuanFTP\web.config` 中配置精准路由转发规则：保留 `/` 根路径与原有 txt/specs 文件正常目录浏览与下载，将 `/stock` 与 `/api/*`、`/css/*`、`/js/*` 无损反向代理至后台监听在 `127.0.0.1:8000` 的 StockAI 核心服务；
        - 完成多端点自动化联调，内网与公网 `http://113.98.232.83:2222/`（原业务）与 `http://113.98.232.83:2222/stock`（StockAI 操盘终端）双轨并行验证 100% 成功。
+- **2026-10-08 [修复服务器端股票行情不准确缺陷：大盘指数代码解析修正、全市场行情异步自愈刷新与自选股实时盘口穿透]**：
+  - **缺陷现象与根本原因排查**：
+    1. **四大核心指数锁死在 3000 点与 +1.56%**：[`app/data/fetcher.py`](file:///d:/AI/stockAnalasis/app/data/fetcher.py) 的 `fetch_specific_quotes` 在代码解析时未识别带市场前缀代码（`sh000001` 等），被错误补全为 `szsh000001` 导致行情源未匹配，触发了默认兜底值（`3000.0` 及平均涨幅）；
+    2. **全市场大盘统计与排行榜数据陈旧**：[`app/data/cache_manager.py`](file:///d:/AI/stockAnalasis/app/data/cache_manager.py) 的 `get_stocks_dataframe` 仅判断 SQLite 表是否为空，从未对本地记录的更新时效性（`updated_at`）进行校验。导致服务器启动后始终只加载部署初始同步的静态数据，未在交易时段内触发外部行情同步；
+    3. **自选股现价未穿透实时盘口**：[`app/services/watchlist_service.py`](file:///d:/AI/stockAnalasis/app/services/watchlist_service.py) 仅从基础全景库关联价格，未在查询时拉取毫秒级即时盘口。
+  - **核心修复与架构演进**：
+    1. **指数与带前缀代码解析修正 ([app/data/fetcher.py](file:///d:/AI/stockAnalasis/app/data/fetcher.py))**：
+       - `fetch_specific_quotes` 全面支持 `sh`、`sz`、`bj` 前缀代码直传；
+       - 结果映射字典同时以 6 位纯数字与带前缀全代码双向建立索引，四大核心指数（上证、深成、创业板、科创50）恢复毫秒级真实行情。
+    2. **全市场行情时效性自愈与异步静默同步 ([app/data/cache_manager.py](file:///d:/AI/stockAnalasis/app/data/cache_manager.py))**：
+       - 引入交易时段时效性判断：盘中时段（09:15 - 15:30）内存缓存 TTL 缩短为 60 秒，SQLite 数据超过 5 分钟自动判定为过期；
+       - 异步刷新防阻塞：当检测到数据过期时，优先返回当前数据避免请求超时，并启动后台守护线程静默拉取 5,565 支标的最新数据更新 SQLite，实现无感刷新。
+    3. **自选股实时盘口穿透 ([app/services/watchlist_service.py](file:///d:/AI/stockAnalasis/app/services/watchlist_service.py))**：
+       - 查询自选股时调用 `fetch_specific_quotes` 获取毫秒级实时价格、涨跌幅与成交量，保障用户自选监控绝对真实。
+    4. **前端大盘定时自动轮询与手动全量同步接口 ([app/web/static/js/app.js](file:///d:/AI/stockAnalasis/app/web/static/js/app.js), [app/web/api.py](file:///d:/AI/stockAnalasis/app/web/api.py))**：
+       - 前端加入 15 秒静默轮询机制；
+       - 新增 `POST /api/market/sync` 接口支持即时全量同步。
 
 

@@ -297,6 +297,21 @@ async def get_market_rankings(
         logger.error("移动端获取大盘排行榜异常: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/api/market/sync")
+async def sync_market_universe() -> Dict[str, Any]:
+    """触发全市场 5000+ 股票实时行情全量同步入库"""
+    try:
+        from app.data.cache_manager import cache_manager
+        df = cache_manager.sync_stocks_from_source()
+        return {
+            "success": not df.empty,
+            "total_synced": len(df),
+            "message": f"成功同步 {len(df)} 支标的最新行情" if not df.empty else "同步返回空数据"
+        }
+    except Exception as e:
+        logger.error("同步全市场行情异常: %s", e)
+        return {"success": False, "message": str(e)}
+
 @app.get("/api/stock/search-index")
 async def get_search_index():
     """获取全市场股票拼音首字母轻量索引，供前端离线/毫秒级模糊匹配"""

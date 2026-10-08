@@ -1476,6 +1476,16 @@ document.addEventListener('DOMContentLoaded', () => {
   // 预取全市场拼音搜索轻量索引
   loadSearchIndex();
 
+  // 盘中自动每隔 15 秒静默轮询当前视图最新行情 (切后台时不发请求)
+  setInterval(() => {
+    if (document.hidden) return;
+    if (state.currentTab === 'tab-market') {
+      loadMarketOverview();
+    } else if (state.currentTab === 'tab-watchlist') {
+      loadWatchlist();
+    }
+  }, 15000);
+
   // 默认激活全景大盘
   switchTab('tab-market');
 });
